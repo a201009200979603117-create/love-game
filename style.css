@@ -1,0 +1,1601 @@
+
+/* ========================================
+   1. 全域設定
+======================================== */
+
+* {
+    box-sizing: border-box;
+}
+
+html {
+    min-height: 100%;
+}
+
+body {
+    background-color: #151525;
+    color: white;
+    font-family: Arial, "Microsoft JhengHei", sans-serif;
+    text-align: center;
+    min-height: 100vh;
+    margin: 0;
+}
+
+button {
+    background-color: #7c4dff;
+    color: white;
+    border: none;
+    padding: 15px 35px;
+    font-size: 18px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition:
+        background-color 0.3s ease,
+        transform 0.3s ease,
+        box-shadow 0.3s ease;
+}
+
+button:hover {
+    background-color: #9575ff;
+    transform: translateY(-3px);
+    box-shadow: 0 5px 20px rgba(124, 77, 255, 0.4);
+}
+
+button:active {
+    transform: scale(0.97);
+}
+
+button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* ========================================
+   2. 遊戲卡片
+======================================== */
+
+.game-card {
+    background-color: #222238;
+    width: 350px;
+    max-width: calc(100% - 40px);
+    padding: 35px;
+    border-radius: 20px;
+    border: 1px solid #514878;
+    box-shadow: 0 0 30px rgba(124, 77, 255, 0.2);
+    margin: 20px;
+}
+
+/* ========================================
+   3. 遊戲主畫面
+======================================== */
+
+#game {
+    position: relative;
+    width: 90%;
+    max-width: 800px;
+    margin: 20px auto;
+    padding: 15px 0 35px;
+}
+
+#game h1 {
+    color: #c7b6ff;
+    font-size: 26px;
+}
+
+#game button {
+    display: block;
+    width: 75%;
+    margin: 12px auto 0;
+    padding: 10px 15px;
+    font-size: 15px;
+    transition:
+        transform 0.2s ease,
+        box-shadow 0.2s ease,
+        background-color 0.3s ease;
+}
+
+#game button:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+}
+
+#game button:active:not(:disabled) {
+    transform: scale(0.97);
+}
+
+#game button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+/* ========================================
+   4. 對話框與角色名稱
+======================================== */
+
+#dialogue-box {
+    background-color: #191927;
+    border: 1px solid #514878;
+    border-radius: 12px;
+    padding: 15px 20px;
+    margin: 25px 0;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+}
+
+#character-name {
+    font-size: 22px;
+    font-weight: bold;
+    color: #ff85a2;
+    margin: 0 0 10px;
+    text-align: left;
+}
+
+#dialogue {
+    margin: 0;
+    min-height: 60px;
+    padding: 20px;
+    background-color: #191927;
+    border: 1px solid #514878;
+    border-radius: 12px;
+    text-align: left;
+    font-size: 17px;
+    line-height: 1.9;
+    color: #fd92d6;
+    letter-spacing: 0.5px;
+    font-weight: 500;
+    overflow-wrap: anywhere;
+    animation: dialogueFadeIn 0.5s ease;
+}
+
+@keyframes dialogueFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ========================================
+   5. 角色區域與登場動畫
+======================================== */
+
+#character-area {
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    min-height: 220px;
+    margin: 20px 0;
+}
+
+#character-placeholder {
+    width: 150px;
+    height: 200px;
+    border: 2px dashed #514878;
+    border-radius: 12px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: #b9a0ff;
+    font-size: 14px;
+    background-color: #191927;
+}
+
+#character-image {
+    display: block;
+    width: 220px;
+    max-width: 100%;
+    max-height: 440px;
+    height: auto;
+    object-fit: contain;
+    object-position: bottom;
+    margin: 0 auto;
+    border-radius: 12px;
+    opacity: 1;
+    transition: opacity 0.25s ease;
+    filter: drop-shadow(0 0 15px rgba(124, 77, 255, 0.3));
+    animation: characterEnter 0.8s ease-out;
+}
+
+@keyframes characterEnter {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ========================================
+   6. 好感度系統
+======================================== */
+
+#affection-panel {
+    margin: 20px 0;
+}
+
+#affection {
+    font-size: 18px;
+    font-weight: bold;
+    color: #ffd580;
+    transition: color 0.3s ease, transform 0.3s ease;
+}
+
+#affection:hover {
+    transform: scale(1.05);
+}
+
+#affection-level {
+    color: #c4a1ff;
+    font-size: 18px;
+    font-weight: bold;
+    text-align: center;
+    margin: 8px 0;
+    transition: color 0.3s ease;
+}
+
+#affection-bar {
+    width: 220px;
+    max-width: 100%;
+    height: 12px;
+    background: #333;
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 10px auto 20px;
+    border: 1px solid #7c4dff;
+}
+
+#affection-fill {
+    width: 0%;
+    height: 100%;
+    background: linear-gradient(90deg, #7c4dff, #ff70c5);
+    border-radius: 10px;
+    transition:
+        width 0.5s ease,
+        background-color 0.5s ease;
+}
+
+#scene-progress {
+    font-size: 13px;
+    color: #888888;
+    text-align: right;
+    margin-top: 8px;
+    letter-spacing: 1px;
+}
+
+/* ========================================
+   7. 劇情選項
+======================================== */
+
+#story-choices {
+    width: 100%;
+    margin: 15px auto;
+}
+
+#story-choices button {
+    width: 75%;
+    margin: 12px auto;
+    line-height: 1.7;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+#game #next-button {
+    width: 75%;
+    margin: 15px auto;
+    background-color: #6541ce;
+}
+
+#game #next-button:hover {
+    background-color: #8967f0;
+}
+
+/* ========================================
+   8. 重新開始按鈕
+======================================== */
+
+#game #restart-button {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    width: auto;
+    min-width: 0;
+    max-width: 110px;
+    padding: 7px 10px;
+    font-size: 12px;
+    line-height: 1.4;
+    margin: 0;
+    z-index: 100;
+    opacity: 0.65;
+    border-radius: 5px;
+    background-color: #514878;
+}
+
+#game #restart-button:hover {
+    opacity: 1;
+    background-color: #7c4dff;
+}
+
+/* ========================================
+   9. 全螢幕結局 CG
+======================================== */
+
+#ending-cg {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: none;
+    width: 100%;
+    height: 100%;
+    height: 100dvh;
+    background: #000;
+    cursor: pointer;
+    overflow: hidden;
+    isolation: isolate;
+}
+
+#ending-cg-image {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    object-position: center;
+    opacity: 0;
+    animation: endingFadeIn 2.5s ease-in-out forwards;
+    animation-delay: 0.2s;
+}
+
+#ending-dialogue-box {
+    position: absolute;
+    z-index: 1;
+    left: 5%;
+    bottom: 3%;
+    width: 90%;
+    max-height: 45vh;
+    box-sizing: border-box;
+    overflow-y: auto;
+    padding: 20px 28px;
+    color: white;
+    background: rgba(15, 15, 30, 0.88);
+    border: 2px solid rgba(255, 220, 240, 0.7);
+    border-radius: 16px;
+    box-shadow: 0 0 25px rgba(255, 160, 220, 0.2);
+    opacity: 0;
+    animation: endingFadeIn 1.5s ease-in-out forwards;
+    animation-delay: 1s;
+}
+
+#ending-cg-title {
+    margin: 0 0 10px;
+    color: #ffd6eb;
+    font-size: 26px;
+}
+
+#ending-cg-dialogue {
+    margin: 0;
+    font-size: 18px;
+    line-height: 1.8;
+    overflow-wrap: anywhere;
+}
+
+#ending-cg-hint {
+    display: block;
+    margin-top: 10px;
+    text-align: right;
+    font-size: 14px;
+    color: #e5c9e0;
+}
+
+@keyframes endingFadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+#ending-cg.show-ending {
+    animation: endingFadeIn 2s ease-in-out forwards;
+}
+
+@keyframes endingFadeOut {
+    from {
+        opacity: 1;
+    }
+
+    to {
+        opacity: 0;
+    }
+}
+
+#ending-cg.fade-out {
+    animation: endingFadeOut 2s ease-in-out forwards !important;
+    pointer-events: none;
+}
+
+/* ========================================
+   10. 主選單背景
+======================================== */
+
+#menu {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100vh;
+    height: 100dvh;
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    padding: 0 8%;
+    background-image: url("images/Main_Screen.png");
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    overflow: hidden;
+    z-index: 10;
+}
+
+/* ========================================
+   11. 主選單撕紙區域
+======================================== */
+
+.menu-overlay {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
+    position: relative;
+    isolation: isolate;
+    width: 45%;
+    max-width: 520px;
+    padding: 55px 45px;
+    color: #29445b;
+}
+
+/* 撕紙從左下角開始，往上擴大 */
+.menu-overlay::before {
+    content: "";
+    position: fixed;
+    z-index: -1;
+    left: 0;
+    bottom: 0;
+    width: 35vw;
+    height: 100vh;
+    height: 100dvh;
+    background: rgba(255, 255, 255, 0.90);
+
+    clip-path: polygon(
+        0 100%,
+        0 0,
+        100% 0,
+        96% 12%,
+        100% 22%,
+        94% 34%,
+        98% 45%,
+        88% 57%,
+        91% 67%,
+        76% 77%,
+        62% 85%,
+        46% 91%,
+        30% 96%,
+        14% 99%
+    );
+
+    filter: drop-shadow(0 12px 20px rgba(65, 95, 115, 0.12));
+    pointer-events: none;
+}
+
+/* ========================================
+   12. 主選單文字
+======================================== */
+
+.menu-subtitle {
+    position: relative;
+    z-index: 1;
+    font-size: 12px;
+    letter-spacing: 5px;
+    color: #6d9fbd;
+    margin: 0 0 25px;
+}
+
+.menu-title {
+    position: relative;
+    z-index: 1;
+    font-size: clamp(38px, 4.5vw, 64px);
+    line-height: 1.4;
+    letter-spacing: 5px;
+    margin: 0 0 25px -80px;
+    color: #29445b;
+    overflow-wrap: anywhere;
+}
+
+.menu-description {
+    position: relative;
+    z-index: 1;
+    font-size: 15px;
+    line-height: 2.2;
+    color: #647d8f;
+    margin: 0 0 32px;
+}
+
+#menu #start-button {
+    position: relative;
+    z-index: 2;
+    display: inline-block;
+    width: auto;
+    min-width: 180px;
+    margin: 0;
+    padding: 15px 26px;
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    border-radius: 8px;
+    background: rgba(125, 177, 207, 0.92);
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+    box-shadow: 0 8px 20px rgba(110, 165, 200, 0.25);
+    transition: all 0.25s ease;
+}
+
+#menu #start-button:hover {
+    background: #5e9fc6;
+    transform: translateY(-3px);
+}
+
+#start-button span {
+    margin-left: 18px;
+}
+
+.menu-footer {
+    position: relative;
+    z-index: 1;
+    margin-top: 55px;
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: #8aa8bc;
+}
+
+/* ========================================
+   13. 手機版與小螢幕
+======================================== */
+
+@media (max-width: 700px) {
+    #menu {
+        padding: 0 5%;
+        background-position: center;
+    }
+
+    .menu-overlay {
+        width: 78%;
+        max-width: 520px;
+        padding: 35px 25px;
+    }
+
+    .menu-overlay::before {
+        position: fixed;
+        left: 0;
+        top: 0;
+        bottom: auto;
+        width: 82vw;
+        height: 100vh;
+        height: 100dvh;
+    }
+
+    .menu-title {
+        font-size: 36px;
+        line-height: 1.4;
+        letter-spacing: 2px;
+        margin-left: -15px;
+    }
+
+    .menu-description {
+        font-size: 13px;
+    }
+
+    .menu-footer {
+        margin-top: 35px;
+    }
+
+    #menu #start-button {
+        min-width: 160px;
+    }
+
+    #game {
+        width: 94%;
+        padding-top: 45px;
+    }
+
+    #character-area {
+        min-height: 180px;
+    }
+
+    #character-image {
+        width: 200px;
+        max-height: 360px;
+    }
+
+    #dialogue {
+        padding: 15px;
+        font-size: 16px;
+    }
+
+    #story-choices button,
+    #game #next-button {
+        width: 90%;
+    }
+
+    #ending-dialogue-box {
+        left: 3%;
+        bottom: 2%;
+        width: 94%;
+        max-height: 50vh;
+        padding: 14px 16px;
+    }
+
+    #ending-cg-title {
+        font-size: 21px;
+    }
+
+    #ending-cg-dialogue {
+        font-size: 16px;
+    }
+}
+
+@media (max-width: 400px) {
+    #game {
+        width: 94%;
+    }
+
+    .menu-overlay {
+        width: 90%;
+        padding: 30px 20px;
+    }
+
+    .menu-title {
+        font-size: 30px;
+        letter-spacing: 1px;
+    }
+
+    .menu-subtitle {
+        font-size: 10px;
+        letter-spacing: 3px;
+    }
+
+    .menu-description {
+        font-size: 12px;
+    }
+
+    #character-area {
+        min-height: 160px;
+    }
+
+    #character-image {
+        width: 175px;
+        max-height: 300px;
+    }
+
+    #character-name {
+        font-size: 20px;
+    }
+
+    #dialogue {
+        font-size: 15px;
+        padding: 12px;
+    }
+
+    #affection,
+    #affection-level {
+        font-size: 16px;
+    }
+
+    #story-choices button,
+    #game #next-button {
+        width: 94%;
+        font-size: 14px;
+    }
+
+    #ending-cg-title {
+        font-size: 19px;
+    }
+
+    #ending-cg-dialogue {
+        font-size: 14px;
+    }
+
+    #ending-cg-hint {
+        font-size: 12px;
+    }
+}
+
+/* ========================================
+   14. 減少動態效果的無障礙支援
+======================================== */
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        scroll-behavior: auto !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* ========================================
+   主畫面淡出、遊戲畫面淡入
+======================================== */
+
+/* 主畫面淡出動畫 */
+#menu.menu-fade-out {
+    animation: menuFadeOut 0.8s ease forwards;
+    pointer-events: none;
+}
+
+/* 遊戲畫面淡入動畫 */
+#game.game-fade-in {
+    animation: gameFadeIn 0.8s ease forwards;
+}
+
+@keyframes menuFadeOut {
+    from {
+        opacity: 1;
+    }
+    to {
+        opacity: 0;
+    }
+}
+
+@keyframes gameFadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+/* ========================================
+   15. 沉浸式遊戲演出升級
+======================================== */
+
+/* 遊戲畫面：柔和的背景光影 */
+#game {
+    isolation: isolate;
+}
+
+#game::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+        radial-gradient(
+            ellipse at 50% 20%,
+            rgba(124, 77, 255, 0.09),
+            transparent 65%
+        );
+    opacity: 0.9;
+}
+
+/* 遊戲標題更有層次 */
+#game h1 {
+    text-shadow:
+        0 0 12px rgba(199, 182, 255, 0.2),
+        0 0 30px rgba(124, 77, 255, 0.12);
+}
+
+/* 對話框：玻璃質感 */
+#dialogue-box {
+    background: rgba(25, 25, 39, 0.94);
+    border-color: rgba(167, 139, 250, 0.45);
+    box-shadow:
+        0 8px 24px rgba(0, 0, 0, 0.2),
+        0 0 18px rgba(124, 77, 255, 0.07);
+    transition:
+        border-color 0.3s ease,
+        box-shadow 0.3s ease;
+}
+
+#dialogue-box:focus-within {
+    border-color: rgba(167, 139, 250, 0.7);
+}
+
+/* 角色名字增加柔和光暈 */
+#character-name {
+    text-shadow: 0 0 14px rgba(255, 133, 162, 0.2);
+}
+
+/* 對話文字提升閱讀舒適度 */
+#dialogue {
+    line-height: 2;
+    letter-spacing: 0.6px;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+/* 角色圖片：自然的登場與陰影 */
+#character-image {
+    filter:
+        drop-shadow(0 8px 18px rgba(0, 0, 0, 0.25))
+        drop-shadow(0 0 12px rgba(124, 77, 255, 0.16));
+    will-change: opacity, transform;
+}
+
+/* 好感度面板 */
+#affection-panel {
+    padding: 12px;
+    border-radius: 14px;
+    background: linear-gradient(
+        135deg,
+        rgba(124, 77, 255, 0.06),
+        rgba(255, 112, 197, 0.04)
+    );
+}
+
+/* 好感度進度條更有光澤 */
+#affection-fill {
+    background: linear-gradient(
+        90deg,
+        #7c4dff,
+        #b47aff,
+        #ff70c5
+    );
+    box-shadow: 0 0 10px rgba(255, 112, 197, 0.3);
+}
+
+/* 劇情選項：更明確的互動回饋 */
+#story-choices button {
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: linear-gradient(
+        135deg,
+        #30264f,
+        #3b2c63
+    );
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+    transition:
+        background 0.25s ease,
+        border-color 0.25s ease,
+        transform 0.25s ease,
+        box-shadow 0.25s ease;
+}
+
+#story-choices button:hover:not(:disabled) {
+    background: linear-gradient(
+        135deg,
+        #514080,
+        #6947a8
+    );
+    border-color: rgba(196, 161, 255, 0.65);
+    box-shadow: 0 6px 18px rgba(124, 77, 255, 0.2);
+    transform: translateY(-2px);
+}
+
+/* 鍵盤操作時顯示清楚的焦點 */
+button:focus-visible {
+    outline: 3px solid #d6c6ff;
+    outline-offset: 4px;
+}
+
+/* 下一步按鈕 */
+#game #next-button {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 5px 16px rgba(101, 65, 206, 0.16);
+}
+
+/* ========================================
+   16. 主選單細節升級
+======================================== */
+
+/* 標題增加淡淡的立體感 */
+.menu-title {
+    text-shadow: 0 2px 12px rgba(41, 68, 91, 0.08);
+}
+
+/* 開始按鈕互動 */
+#menu #start-button {
+    box-shadow:
+        0 8px 20px rgba(110, 165, 200, 0.22),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+#menu #start-button:focus-visible {
+    outline-color: #5e9fc6;
+}
+
+/* 主選單離場時避免動畫結束後突然閃回 */
+#menu.menu-fade-out {
+    pointer-events: none;
+}
+
+/* ========================================
+   17. 手機與平板操作改善
+======================================== */
+
+/* 避免手機按鈕觸控時出現不必要的點擊反應 */
+button {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* 避免遊戲區域超出螢幕 */
+#game {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+/* 中小型裝置 */
+@media (max-width: 700px) {
+    #game {
+        width: 94%;
+        max-width: 800px;
+        margin: 12px auto;
+        padding-bottom: 24px;
+    }
+
+    #game h1 {
+        font-size: clamp(21px, 5vw, 26px);
+    }
+
+    #dialogue-box {
+        margin: 18px 0;
+        padding: 13px;
+    }
+
+    #character-name {
+        font-size: 20px;
+    }
+
+    #dialogue {
+        min-height: 55px;
+        padding: 14px;
+        line-height: 1.85;
+        font-size: 16px;
+    }
+
+    #story-choices button,
+    #game #next-button {
+        width: 94%;
+        min-height: 46px;
+        padding: 12px 15px;
+        font-size: 15px;
+    }
+
+    #affection-bar {
+        max-width: 85%;
+    }
+
+    #game #restart-button {
+        top: max(8px, env(safe-area-inset-top));
+        left: max(8px, env(safe-area-inset-left));
+    }
+
+    /* 結局文字避開手機底部安全區 */
+    #ending-dialogue-box {
+        bottom: max(12px, env(safe-area-inset-bottom));
+        max-height: 48dvh;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+
+    #ending-cg-hint {
+        line-height: 1.6;
+    }
+}
+
+/* 小型手機 */
+@media (max-width: 400px) {
+    #dialogue-box {
+        padding: 10px;
+    }
+
+    #dialogue {
+        padding: 12px;
+        font-size: 15px;
+        line-height: 1.8;
+    }
+
+    #character-area {
+        margin: 12px 0;
+    }
+
+    #story-choices button,
+    #game #next-button {
+        width: 96%;
+        min-height: 46px;
+        padding: 11px 12px;
+        font-size: 14px;
+    }
+
+    #affection-panel {
+        padding: 8px;
+    }
+
+    #ending-dialogue-box {
+        left: 3%;
+        width: 94%;
+        padding: 12px;
+    }
+}
+
+/* 橫向手機：盡量保留角色和對話區域 */
+@media (max-width: 900px) and (orientation: landscape) {
+    #character-area {
+        min-height: 120px;
+        margin: 10px 0;
+    }
+
+    #character-image {
+        max-height: 34vh;
+        width: auto;
+        max-width: 65%;
+    }
+
+    #dialogue-box {
+        margin: 12px 0;
+    }
+
+    #dialogue {
+        min-height: 40px;
+        padding: 10px 14px;
+    }
+
+    #ending-dialogue-box {
+        max-height: 42dvh;
+    }
+}
+
+/* ========================================
+   18. 減少動畫使用者的無障礙支援
+======================================== */
+
+@media (prefers-reduced-motion: reduce) {
+    #character-image {
+        will-change: auto;
+    }
+}
+
+/* ========================================
+   遊戲設定面板｜心動的每一天
+======================================== */
+
+/* 遊戲工具列 */
+#game-toolbar {
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* 重開遊戲與設定按鈕 */
+#game #restart-button,
+#settings-button {
+    position: static;
+    width: auto;
+    min-width: 88px;
+    margin: 0;
+    padding: 10px 16px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 10px;
+    background: rgba(20, 18, 35, 0.78);
+    color: #fff;
+    font-size: 14px;
+    cursor: pointer;
+    backdrop-filter: blur(10px);
+    transition: background 0.25s, transform 0.25s;
+}
+
+#game #restart-button:hover,
+#settings-button:hover {
+    background: rgba(130, 95, 180, 0.9);
+    transform: translateY(-2px);
+}
+
+/* 設定視窗背景 */
+#settings-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(8, 7, 20, 0.78);
+    backdrop-filter: blur(9px);
+    -webkit-backdrop-filter: blur(9px);
+    animation: settingsFadeIn 0.25s ease;
+}
+
+/* 設定面板 */
+#settings-panel {
+    width: min(460px, 100%);
+    max-height: 88vh;
+    max-height: 88dvh;
+    overflow-y: auto;
+    padding: 28px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 20px;
+    background:
+        linear-gradient(
+            145deg,
+            rgba(43, 35, 66, 0.98),
+            rgba(19, 18, 36, 0.98)
+        );
+    color: #fff;
+    text-align: left;
+    box-shadow: 0 20px 70px rgba(0, 0, 0, 0.45);
+    animation: settingsSlideIn 0.3s ease;
+}
+
+/* 設定標題 */
+#settings-panel h2 {
+    margin: 0 0 8px;
+    color: #f4d9ff;
+    font-size: 26px;
+    text-align: center;
+    letter-spacing: 2px;
+}
+
+#settings-panel > p {
+    margin: 0 0 26px;
+    color: rgba(255, 255, 255, 0.65);
+    font-size: 13px;
+    text-align: center;
+}
+
+/* 每個設定項目 */
+#settings-panel .setting-item {
+    margin-bottom: 24px;
+}
+
+#settings-panel label {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+    color: #f1eaff;
+    font-size: 15px;
+}
+
+#settings-panel label span {
+    color: #d8b8ff;
+    font-size: 13px;
+}
+
+/* 滑桿 */
+#settings-panel input[type="range"] {
+    display: block;
+    width: 100%;
+    height: 6px;
+    margin: 14px 0;
+    border-radius: 20px;
+    accent-color: #c49aff;
+    cursor: pointer;
+}
+
+#settings-panel input[type="range"]:focus-visible {
+    outline: 2px solid #e3c7ff;
+    outline-offset: 5px;
+}
+
+/* 打字機效果開關 */
+#settings-panel .setting-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+#settings-panel input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    accent-color: #c49aff;
+    cursor: pointer;
+}
+
+/* 設定面板按鈕 */
+#settings-panel button {
+    display: block;
+    width: 100%;
+    min-height: 44px;
+    margin-top: 12px;
+    padding: 12px 16px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    font-size: 15px;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.2s;
+}
+
+#settings-panel button:hover {
+    background: rgba(180, 135, 235, 0.3);
+    transform: translateY(-1px);
+}
+
+#settings-panel #settings-done {
+    margin-top: 22px;
+    border: none;
+    background: linear-gradient(135deg, #a77be8, #7956bd);
+    color: white;
+    font-weight: bold;
+}
+
+#settings-panel #settings-done:hover {
+    background: linear-gradient(135deg, #bb96f5, #9270d5);
+}
+
+/* 面板動畫 */
+@keyframes settingsFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes settingsSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(16px) scale(0.97);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* 手機版 */
+@media (max-width: 600px) {
+    #game-toolbar {
+        top: max(8px, env(safe-area-inset-top));
+        left: max(8px, env(safe-area-inset-left));
+        gap: 6px;
+    }
+
+    #game #restart-button,
+    #settings-button {
+        min-width: 0;
+        padding: 8px 11px;
+        border-radius: 8px;
+        font-size: 12px;
+    }
+
+    #settings-overlay {
+        padding: 12px;
+    }
+
+    #settings-panel {
+        padding: 22px 18px;
+        border-radius: 16px;
+        max-height: 85vh;
+        max-height: 85dvh;
+    }
+
+    #settings-panel h2 {
+        font-size: 22px;
+    }
+
+    #settings-panel .setting-item {
+        margin-bottom: 20px;
+    }
+}
+
+/* 手機橫向時 */
+@media (max-height: 500px) and (orientation: landscape) {
+    #settings-overlay {
+        align-items: flex-start;
+        padding: 8px;
+    }
+
+    #settings-panel {
+        width: min(500px, 100%);
+        max-height: 92vh;
+        max-height: 92dvh;
+        padding: 16px 20px;
+    }
+
+    #settings-panel h2 {
+        font-size: 20px;
+    }
+
+    #settings-panel > p {
+        margin-bottom: 16px;
+    }
+
+    #settings-panel .setting-item {
+        margin-bottom: 14px;
+    }
+}
+
+/* 減少動態效果的裝置 */
+@media (prefers-reduced-motion: reduce) {
+    #settings-overlay,
+    #settings-panel {
+        animation: none;
+    }
+
+    #game #restart-button,
+    #settings-button,
+    #settings-panel button {
+        transition: none;
+    }
+}
+/* ========================================
+   遊戲設定介面
+======================================== */
+
+#game-toolbar {
+    position: fixed;
+    top: 14px;
+    left: 14px;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#game #restart-button,
+#settings-button {
+    position: static;
+    width: auto;
+    min-height: 42px;
+    padding: 10px 16px;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 12px;
+    background: rgba(25, 22, 42, 0.82);
+    color: #fff;
+    font-size: 14px;
+    cursor: pointer;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.2);
+    transition:
+        background 0.2s ease,
+        transform 0.2s ease,
+        border-color 0.2s ease;
+}
+
+#game #restart-button:hover,
+#settings-button:hover {
+    background: rgba(110, 76, 145, 0.9);
+    border-color: rgba(255, 190, 230, 0.8);
+    transform: translateY(-2px);
+}
+
+/* 設定視窗背景 */
+
+#settings-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(10, 8, 22, 0.78);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+/* 設定面板 */
+
+#settings-panel {
+    position: relative;
+    width: min(460px, 100%);
+    max-height: 88vh;
+    max-height: 88dvh;
+    overflow-y: auto;
+    padding: 30px;
+    border: 1px solid rgba(255, 190, 230, 0.28);
+    border-radius: 24px;
+    background:
+        radial-gradient(
+            circle at top right,
+            rgba(148, 104, 180, 0.2),
+            transparent 45%
+        ),
+        linear-gradient(145deg, #211c35, #141222);
+    color: #f7efff;
+    box-shadow:
+        0 25px 80px rgba(0, 0, 0, 0.5),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    animation: settingsAppear 0.28s ease-out;
+}
+
+@keyframes settingsAppear {
+    from {
+        opacity: 0;
+        transform: translateY(14px) scale(0.97);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+#settings-panel h2 {
+    margin: 0 0 8px;
+    color: #ffd5ef;
+    font-size: 26px;
+    text-align: center;
+    letter-spacing: 2px;
+}
+
+#settings-panel > p {
+    margin: 0 0 26px;
+    color: #bdb3d1;
+    font-size: 13px;
+    text-align: center;
+}
+
+/* 每一組設定 */
+
+#settings-panel label {
+    display: block;
+    margin: 20px 0 10px;
+    color: #f3e8ff;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+#settings-panel label span {
+    float: right;
+    color: #ffb9df;
+    font-weight: 400;
+}
+
+#settings-panel input[type="range"] {
+    display: block;
+    width: 100%;
+    height: 6px;
+    margin: 12px 0;
+    border-radius: 99px;
+    accent-color: #eaa0d1;
+    cursor: pointer;
+}
+
+#settings-panel .setting-description {
+    margin: 6px 0 0;
+    color: #aaa0bd;
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+/* 逐字顯示開關 */
+
+#settings-panel .setting-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 24px 0;
+    padding: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.04);
+}
+
+#settings-panel .setting-toggle label {
+    margin: 0;
+}
+
+#typewriter-toggle {
+    width: 20px;
+    height: 20px;
+    accent-color: #eaa0d1;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+/* 設定按鈕 */
+
+#settings-panel button {
+    width: 100%;
+    min-height: 44px;
+    margin-top: 10px;
+    padding: 12px 16px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.07);
+    color: #fff;
+    font-size: 15px;
+    cursor: pointer;
+    transition:
+        background 0.2s ease,
+        transform 0.2s ease;
+}
+
+#settings-panel button:hover {
+    background: rgba(234, 160, 209, 0.2);
+    transform: translateY(-1px);
+}
+
+#settings-panel #settings-done {
+    margin-top: 22px;
+    border: none;
+    background: linear-gradient(135deg, #d77db8, #9275d8);
+    color: #fff;
+    font-weight: 700;
+    box-shadow: 0 5px 18px rgba(180, 105, 190, 0.22);
+}
+
+#settings-panel #settings-done:hover {
+    background: linear-gradient(135deg, #e695ca, #a18ae8);
+}
+
+/* 手機版 */
+
+@media (max-width: 600px) {
+    #game-toolbar {
+        top: 10px;
+        left: 10px;
+        gap: 7px;
+    }
+
+    #game #restart-button,
+    #settings-button {
+        min-height: 38px;
+        padding: 8px 11px;
+        font-size: 12px;
+    }
+
+    #settings-overlay {
+        padding: 12px;
+    }
+
+    #settings-panel {
+        padding: 22px 18px;
+        border-radius: 18px;
+    }
+
+    #settings-panel h2 {
+        font-size: 22px;
+    }
+
+    #settings-panel label {
+        font-size: 14px;
+    }
+}
+
+/* 手機橫向畫面 */
+
+@media (max-height: 500px) {
+    #settings-overlay {
+        align-items: flex-start;
+        overflow-y: auto;
+    }
+
+    #settings-panel {
+        margin: auto;
+        max-height: none;
+    }
+}
+
+/* 尊重使用者的減少動畫設定 */
+
+@media (prefers-reduced-motion: reduce) {
+    #settings-panel,
+    #settings-panel *,
+    #game-toolbar button {
+        animation: none !important;
+        transition: none !important;
+    }
+}
