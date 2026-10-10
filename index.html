@@ -17,6 +17,35 @@
          主選單
     ============================== -->
     <div id="menu">
+        
+        
+        <div class="floating-hearts" aria-hidden="true">
+            <span>♡</span>
+            <span>♥</span>
+            <span>♡</span>
+            <span>♥</span>
+            <span>♡</span>
+            <span>♥</span>
+            <span>♡</span>
+            <span>♥</span>
+            <span>♡</span>
+            <span>♥</span>
+            <span>♡</span>
+            <span>♥</span>
+        </div>
+                
+        <div class="floating-sparkles" aria-hidden="true">
+            <span>✦</span>
+            <span>✧</span>
+            <span>✦</span>
+            <span>✧</span>
+            <span>✦</span>
+            <span>✧</span>
+            <span>✦</span>
+            <span>✧</span>
+        </div>
+
+
         <div class="menu-overlay">
             <p class="menu-subtitle">MY YOUTH, MY STORY</p>
 
@@ -48,6 +77,21 @@
             >
                 重新開始
             </button>
+            
+            <button
+                id="save-button"
+                onclick="saveGame()"
+            >
+                💾 存檔
+            </button>
+
+            <button
+                id="load-button"
+                onclick="loadGame()"
+            >
+                📂 讀檔
+            </button>
+
 
             <button
                 id="settings-button"
@@ -59,12 +103,16 @@
         </div>
 
 
+        <!-- 遊戲背景 -->
+        <div id="scene-background"></div>
+        <div id="scene-overlay"></div>
+
         <!-- 女主角 -->
         <div id="character-area">
             <img
                 id="character-image"
                 src="images/heroine.png"
-                alt="女主角"
+                alt="柳如煙"
             >
         </div>
 
@@ -98,14 +146,6 @@
         <!-- 劇情選項由 script.js 自動建立 -->
         <div id="story-choices" style="display: none;"></div>
 
-
-        <!-- 下一段劇情 -->
-        <button
-            id="next-button"
-            onclick="nextDialogue()"
-        >
-            下一段 ▶
-        </button>
 
 
         <!-- ==============================
