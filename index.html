@@ -75,7 +75,7 @@
                 id="restart-button"
                 onclick="restartGame()"
             >
-                重新開始
+                重開
             </button>
             
             <button
@@ -90,6 +90,11 @@
                 onclick="loadGame()"
             >
                 📂 讀檔
+            </button>
+            <button id="puzzle-button" 
+            onclick="openPuzzleModal()"
+            >
+            🔍 解謎
             </button>
 
 
@@ -331,6 +336,86 @@
         </div>
 
     </main>
+    
+    <!-- 解謎彈窗 -->
+    <div id="puzzle-modal" class="puzzle-modal">
+        <div class="puzzle-window">
+
+            <div class="puzzle-header">
+                <h2>✦ 解謎筆記 ✦</h2>
+                <button class="puzzle-close"
+                        onclick="closePuzzleModal()">✕</button>
+            </div>
+
+            <div class="puzzle-tabs">
+                <button class="puzzle-tab active"
+                        onclick="showPuzzleTab('clues')">
+                    📖 線索筆記
+                </button>
+
+                <button class="puzzle-tab"
+                        onclick="showPuzzleTab('puzzles')">
+                    🔍 解開謎題
+                </button>
+            </div>
+
+            <div id="puzzle-clues" class="puzzle-content">
+                <p class="puzzle-description">
+                    你所收集的線索，都記錄在這裡。
+                </p>
+                <div id="puzzle-clue-list"></div>
+            </div>
+
+            <div id="puzzle-list" class="puzzle-content"
+                style="display:none;">
+                <p class="puzzle-description">
+                    仔細思考線索，找出被隱藏的真相。
+                </p>
+
+                <button class="puzzle-entry"
+                        onclick="solvePhotoPuzzle()">
+                    <span>📷 舊照片之謎</span>
+                    <span id="photo-puzzle-status">尚未解開</span>
+                </button>
+
+                <button class="puzzle-entry"
+                        onclick="solveLetterPuzzle()">
+                    <span>✉️ 神祕信件之謎</span>
+                    <span id="letter-puzzle-status">尚未解開</span>
+                </button>
+                
+                <div id="puzzle-answer-area" style="display:none;">
+                    <h3 id="puzzle-question-title">🔍 解開謎題</h3>
+
+                    <p id="puzzle-question-text">
+                        仔細思考你找到的線索。
+                    </p>
+
+                    <input
+                        type="text"
+                        id="puzzle-answer-input"
+                        placeholder="輸入你的答案"
+                        autocomplete="off"
+                    >
+
+                    <div class="puzzle-answer-actions">
+                        <button type="button" onclick="submitPuzzleAnswer()">
+                            確認答案
+                        </button>
+
+                        <button type="button" onclick="cancelPuzzleAnswer()">
+                            返回
+                        </button>
+                    </div>
+
+                    <p id="puzzle-feedback" aria-live="polite"></p>
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+
 
 
     <!-- JavaScript -->

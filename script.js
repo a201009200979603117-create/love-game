@@ -28,11 +28,332 @@ let hasChosen = false;
 let hiddenEndingUnlocked = false;
 let specialChoices = new Set();
 
+// 記錄玩家的重要劇情選擇
+let storyFlags = new Set();
+
+// 記錄目前與柳如煙的關係狀態
+let relationshipStage = "normal";
+
+// 更新關係狀態
+function updateRelationshipStage() {
+    if (affection >= 70) {
+        relationshipStage = "close";
+    } else if (affection >= 40) {
+        relationshipStage = "normal";
+    } else {
+        relationshipStage = "distant";
+    }
+}
+
+// 根據玩家過去的選擇，取得不同的劇情文字
+function getStoryText(normalText, variations = {}) {
+    // 優先顯示專屬選擇的劇情
+    for (const flag of storyFlags) {
+        if (variations[flag]) {
+            return variations[flag];
+        }
+    }
+
+    // 沒有特殊選擇時，依照關係狀態顯示
+    if (
+        relationshipStage === "distant" &&
+        variations.distant
+    ) {
+        return variations.distant;
+    }
+
+    if (
+        relationshipStage === "close" &&
+        variations.close
+    ) {
+        return variations.close;
+    }
+
+    return normalText;
+}
+
+// 已發現的解謎線索
+let discoveredClues = new Set();
+// 已解開的謎題
+let solvedPuzzles = new Set();
+
+// 線索資料
+const clueData = {
+    old_photo: {
+        name: "舊照片",
+        description: "照片裡有兩個孩子，背面寫著一個未完成的約定。"
+    },
+    mysterious_letter: {
+        name: "神祕信件",
+        description: "一封沒有寄出的信，可能藏著約定的真正原因。"
+    },
+    past_memory: {
+        name: "遺失的回憶",
+        description: "從童年片段中拼湊出來的記憶。"
+    }
+};
+
+// 收集線索
+function collectClue(clueId) {
+    if (!clueData[clueId]) {
+        return;
+    }
+
+    if (discoveredClues.has(clueId)) {
+        return;
+    }
+
+    discoveredClues.add(clueId);
+
+    alert(
+        "發現新線索！\n\n" +
+        clueData[clueId].name +
+        "\n" +
+        clueData[clueId].description
+    );
+}
+
+let currentPuzzle = null;
+
+// 開始解謎：改用遊戲內的輸入區
+function solvePuzzle(puzzleId, question, correctAnswer) {
+    if (solvedPuzzles.has(puzzleId)) {
+        alert("你已經解開這道謎題了！");
+        updatePuzzleStatus();
+        return;
+    }
+
+    currentPuzzle = {
+        id: puzzleId,
+        answer: correctAnswer
+    };
+
+    const title = document.getElementById("puzzle-question-title");
+    const questionText = document.getElementById("puzzle-question-text");
+    const answerInput = document.getElementById("puzzle-answer-input");
+    const answerArea = document.getElementById("puzzle-answer-area");
+    const feedback = document.getElementById("puzzle-feedback");
+
+    if (!title || !questionText || !answerInput || !answerArea || !feedback) {
+        alert("找不到解謎輸入區，請確認 index.html 已加入答案輸入區。");
+        return;
+    }
+
+    title.textContent = "🔍 " + question.split("\n")[0].replace(/[【】]/g, "");
+    questionText.textContent = question;
+    answerInput.value = "";
+    feedback.textContent = "";
+    feedback.style.color = "#c5c0dc";
+
+    answerArea.style.display = "block";
+    answerInput.focus();
+}
+
+// 確認答案
+function submitPuzzleAnswer() {
+    if (!currentPuzzle) return;
+
+    const answerInput = document.getElementById("puzzle-answer-input");
+    const feedback = document.getElementById("puzzle-feedback");
+
+    const answer = answerInput.value.trim();
+
+    if (!answer) {
+        feedback.textContent = "請先輸入答案。";
+        feedback.style.color = "#ffcf8a";
+        return;
+    }
+
+    if (answer === currentPuzzle.answer) {
+        solvedPuzzles.add(currentPuzzle.id);
+
+        feedback.textContent = "✦ 解謎成功！你離真相又近了一步。";
+        feedback.style.color = "#a8f0c6";
+
+        updatePuzzleStatus();
+        currentPuzzle = null;
+    } else {
+        feedback.textContent = "答案不正確，再仔細想想線索吧。";
+        feedback.style.color = "#ffaaa9";
+    }
+}
+
+// 返回謎題列表
+function cancelPuzzleAnswer() {
+    const answerArea = document.getElementById("puzzle-answer-area");
+
+    if (answerArea) {
+        answerArea.style.display = "none";
+    }
+
+    currentPuzzle = null;
+}
+
+
+function solvePhotoPuzzle() {
+    // 必須先取得舊照片線索
+    if (!discoveredClues.has("old_photo")) {
+        alert("你還沒有找到舊照片，無法解開這道謎題。");
+        return;
+    }
+
+    solvePuzzle(
+        "photo_date",
+        "【舊照片之謎】\n\n照片背面的約定日期已經模糊不清。\n\n請輸入你推測的年份（西元四位數）：",
+        "2015"
+    );
+}
+
+function solveLetterPuzzle() {
+    // 必須先找到神祕信件
+    if (!discoveredClues.has("mysterious_letter")) {
+        alert("你還沒有找到神祕信件，無法解開這道謎題。");
+        return;
+    }
+
+    solvePuzzle(
+        "letter_secret",
+        "【神祕信件之謎】\n\n信件裡留下了一句話：\n「真正重要的，不是你記得多少，而是你是否願意再次尋找。」\n\n請輸入這句話的核心答案：",
+        "尋找"
+    );
+}
+
+
+// 顯示線索筆記本
+function showClueNotebook() {
+    const clues = Array.from(discoveredClues);
+
+    if (clues.length === 0) {
+        alert("目前還沒有找到任何線索。");
+        return;
+    }
+
+    let message = "📖 線索筆記本\n\n";
+
+    clues.forEach((clueId, index) => {
+        const clue = clueData[clueId];
+
+        if (clue) {
+            message +=
+                `${index + 1}. ${clue.name}\n` +
+                `${clue.description}\n\n`;
+        }
+    });
+
+    alert(message);
+}
+
+/* ==============================
+   解謎視窗控制
+============================== */
+
+// 開啟解謎視窗
+function openPuzzleModal() {
+    const modal = document.getElementById("puzzle-modal");
+
+    if (!modal) return;
+
+    modal.style.display = "flex";
+    showPuzzleTab("clues");
+}
+
+// 關閉解謎視窗
+function closePuzzleModal() {
+    const modal = document.getElementById("puzzle-modal");
+
+    if (modal) {
+        modal.style.display = "none";
+    }
+}
+
+// 切換分頁
+function showPuzzleTab(tab) {
+    const cluePage = document.getElementById("puzzle-clues");
+    const puzzlePage = document.getElementById("puzzle-list");
+    const tabs = document.querySelectorAll(".puzzle-tab");
+
+    if (!cluePage || !puzzlePage) return;
+
+    cluePage.style.display = tab === "clues" ? "block" : "none";
+    puzzlePage.style.display = tab === "puzzles" ? "block" : "none";
+
+    tabs.forEach(button => {
+        button.classList.remove("active");
+    });
+
+    const activeIndex = tab === "clues" ? 0 : 1;
+
+    if (tabs[activeIndex]) {
+        tabs[activeIndex].classList.add("active");
+    }
+
+    if (tab === "clues") {
+        renderPuzzleClues();
+    }
+
+    updatePuzzleStatus();
+}
+
+// 顯示已收集的線索
+function renderPuzzleClues() {
+    const container = document.getElementById("puzzle-clue-list");
+
+    if (!container) return;
+
+    container.innerHTML = "";
+
+    const clues = Array.from(discoveredClues);
+
+    if (clues.length === 0) {
+        container.innerHTML =
+            '<div class="puzzle-empty">✦<br>目前還沒有找到任何線索。<br>探索校園，尋找被遺忘的回憶吧。</div>';
+        return;
+    }
+
+    clues.forEach(clueId => {
+        const clue = clueData[clueId];
+
+        if (!clue) return;
+
+        const card = document.createElement("div");
+        card.className = "puzzle-clue-card";
+
+        const title = document.createElement("h3");
+        title.textContent = "✦ " + clue.name;
+
+        const description = document.createElement("p");
+        description.textContent = clue.description;
+
+        card.appendChild(title);
+        card.appendChild(description);
+        container.appendChild(card);
+    });
+}
+
+// 更新謎題狀態
+function updatePuzzleStatus() {
+    const photoStatus = document.getElementById("photo-puzzle-status");
+    const letterStatus = document.getElementById("letter-puzzle-status");
+
+    if (photoStatus) {
+        photoStatus.textContent = solvedPuzzles.has("photo_date")
+            ? "✓ 已解開"
+            : "尚未解開";
+    }
+
+    if (letterStatus) {
+        letterStatus.textContent = solvedPuzzles.has("letter_secret")
+            ? "✓ 已解開"
+            : "尚未解開";
+    }
+}
+
 let typingTimer = null;
 let currentText = "";
 let endingCgStep = 0;
 let currentEndingText = "";
 let endingTimer = null;
+
 // ========================================
 // 遊戲設定
 // ========================================
@@ -78,195 +399,508 @@ const sceneBackgrounds = {
 };
 
 const storyScenes = [
+    // ==============================
+    // 第一章：轉學生的秘密
+    // ==============================
+
+    // 第 1 段：初次相遇
     {
         name: "旁白",
         background: "classroom",
-        text: "早自習前，你走進教室。窗邊坐著一位陌生的女孩，老師昨天說的轉校生柳如煙就是她吧，她正低頭整理課本。你們還沒有正式說過話。",
+        text: "九月的早晨，陽光穿過教室的窗戶。班導帶著一名陌生的少女走進教室。她有著安靜的氣質，手裡抱著幾本課本。當她看向你時，腳步似乎停頓了一瞬，但很快又恢復平靜。",
         choices: [
-            { text: "主動向她打招呼", affection: 3, expression: "normal", response: "柳如煙抬起頭，稍微愣了一下。「早安。」她禮貌地回應，接著繼續整理課本。", special: "first_greeting" },
-            { text: "直接坐下，不理會她", affection: 0, expression: "normal", response: "你直接回到座位。柳如煙看了你一眼，沒有說話，教室裡又恢復了原本的安靜。" }
+            {
+                text: "主動自我介紹，歡迎她加入班級",
+                affection: 3,
+                expression: "happy",
+                response: "少女似乎沒料到你會主動開口。她輕輕點頭，露出淡淡的笑容。「你好，我叫柳如煙。以後請多多指教。」",
+                special: "first_greeting"
+            },
+            {
+                text: "注意到她剛才的停頓，詢問是不是有事",
+                affection: 1,
+                expression: "normal",
+                response: "柳如煙微微一怔，隨即搖頭。「沒事，只是第一次來新環境，有點不習慣。」她把課本抱得更緊了一些。",
+                special: "noticed_familiarity"
+            }
         ]
     },
+
+    // 第 2 段：奇怪的名字
     {
         name: "柳如煙",
         background: "classroom",
-        text: "過了一會兒，柳如煙拿著課本走到你旁邊。「不好意思，我想問一下，今天第一節是數學課嗎？」",
+        text: "老師安排柳如煙坐在你附近。整理座位時，她忽然輕聲念了一次你的名字。你轉頭看她，她立刻把視線移回課本。",
         choices: [
-            { text: "耐心告訴她課程安排", affection: 5, expression: "happy", response: "柳如煙確認課表後，輕輕點頭。「謝謝你，還好有問你。」她的語氣比剛才自然了一些。" },
-            { text: "不耐煩地叫她自己看課表", affection: -4, expression: "angry", response: "柳如煙皺起眉頭。「我只是問一下而已，有必要這麼兇嗎？」她拿著課本回到座位，沒有再看你。" }
+            {
+                text: "直接問她怎麼知道自己的名字",
+                affection: 2,
+                expression: "normal",
+                response: "「老師剛剛點名的時候有說呀。」柳如煙回答得很快，接著笑了笑。「你的名字還滿好記的。」",
+                special: "asked_name"
+            },
+            {
+                text: "先不追問，繼續整理自己的東西",
+                affection: 1,
+                expression: "normal",
+                response: "你沒有追問。柳如煙偷偷看了你一眼，隨後拿起筆，在筆記本角落畫了一個小小的星星。",
+                special: "observed_star"
+            }
         ]
     },
+
+    // 第 3 段：借課本
+    {
+        name: "柳如煙",
+        background: "classroom",
+        text: "第一節課開始前，柳如煙發現自己的課本還沒領齊。她猶豫了一會兒，才開口問你能不能一起看。",
+        choices: [
+            {
+                text: "把課本移到中間，和她一起看",
+                affection: 4,
+                expression: "happy",
+                response: "「謝謝你。」柳如煙把椅子稍微移近。課堂中途，她忽然問你：「你平常放學後都做些什麼？」",
+                special: "shared_textbook"
+            },
+            {
+                text: "答應借她看，順便問她適不適應新學校",
+                affection: 2,
+                expression: "normal",
+                response: "柳如煙笑著說：「目前還好，就是有些地方還不熟悉。」她看了看窗外，又補了一句：「希望能快點認識新朋友。」",
+                special: "asked_transfer_reason"
+            }
+        ]
+    },
+
+    // 第 4 段：不熟悉的旋律
+    {
+        name: "旁白",
+        background: "school",
+        text: "下課後，你在走廊遇見柳如煙。她戴著耳機，輕輕哼著一段旋律。那旋律很簡單，聽起來有些懷舊。當她發現你站在旁邊，便停了下來。",
+        choices: [
+            {
+                text: "詢問那是什麼歌",
+                affection: 2,
+                expression: "normal",
+                response: "「是以前聽過的一段旋律，我也不知道歌名。」柳如煙摘下耳機。「有時候明明很久沒聽，卻還是會記得。」",
+                special: "heard_melody"
+            },
+            {
+                text: "開玩笑說她唱得還不錯",
+                affection: 3,
+                expression: "happy",
+                response: "柳如煙愣了一下，隨後有些不好意思地笑了。「你不要突然稱讚我啦，我只是隨便哼哼而已。」",
+                special: "remembered_melody"
+            }
+        ]
+    },
+
+    // 第 5 段：福利社的選擇
+    {
+        name: "柳如煙",
+        background: "school",
+        text: "午休時，你和柳如煙一起走到福利社。她在飲料櫃前看了一會兒，最後拿起一瓶包裝簡單的汽水。「這個味道還不錯。」她說。",
+        choices: [
+            {
+                text: "買同款飲料，和她一起喝",
+                affection: 3,
+                expression: "happy",
+                response: "柳如煙看著你手上的飲料，笑了起來。「你也喜歡這個嗎？那下次可以一起來買。」",
+                special: "shared_drink"
+            },
+            {
+                text: "推薦另一種飲料給她",
+                affection: 2,
+                expression: "normal",
+                response: "柳如煙看了看你推薦的飲料，笑著搖頭。「下次再試試看吧，今天我還是想喝原本這個。」",
+                special: "kept_preference"
+            }
+        ]
+    },
+
+    // 第 6 段：忘記帶的東西
     {
         name: "旁白",
         background: "classroom",
-        text: "下課後，柳如煙一個人坐在座位上。其他同學陸續離開教室，她似乎還不太熟悉這個班級。",
+        text: "下午上課前，柳如煙翻遍了筆袋，卻找不到自己的橡皮擦。她轉頭看向你，似乎有點不好意思。",
         choices: [
-            { text: "問她要不要一起去福利社", affection: 5, expression: "happy", response: "柳如煙有些意外。「可以呀，我正好想去買水。」她收好錢包，和你一起走出教室。" },
-            { text: "當著她的面說她很孤僻", affection: -6, expression: "angry", response: "柳如煙的表情立刻沉了下來。「我只是還不熟悉大家，不代表我很孤僻。」她說完便轉身離開。" }
+            {
+                text: "直接把橡皮擦借給她",
+                affection: 3,
+                expression: "happy",
+                response: "「謝謝你，明天我再還你。」柳如煙接過橡皮擦，認真地放在桌角，還特地用便利貼寫下你的名字。",
+                special: "lent_eraser"
+            },
+            {
+                text: "提醒她下次記得檢查文具",
+                affection: 1,
+                expression: "normal",
+                response: "「知道了啦。」柳如煙小聲回答，接著忍不住笑了。「你講話怎麼跟老師一樣？」",
+                special: "reminded_supplies"
+            }
         ]
     },
-    {
-        name: "柳如煙",
-        background: "school",          
-        text: "走到福利社後，柳如煙看著冰櫃裡的飲料。「你平常都喝什麼？我每次來都不知道該買哪一種。」",
-        choices: [
-            { text: "推薦自己喜歡的飲料", affection: 4, expression: "happy", response: "柳如煙聽得很認真。「那我下次試試看！如果好喝，再跟你分享心得。」" },
-            { text: "敷衍地說隨便買就好", affection: -2, expression: "normal", response: "柳如煙看了你一眼。「好吧，那我自己選。」她拿起一瓶飲料，沒有再問你。" }
-        ]
-    },
-    {
-        name: "旁白",
-        background: "classroom",
-        text: "回到教室後，老師突然宣布要使用課本。柳如煙翻遍書包，才發現自己忘記帶課本了。",
-        choices: [
-            { text: "主動和她共用課本", affection: 6, expression: "happy", response: "柳如煙鬆了一口氣。「真的可以嗎？謝謝你，我會小心翻頁的。」她把椅子稍微移近了一點，方便一起看課本。" },
-            { text: "嘲笑她連課本都會忘記", affection: -7, expression: "angry", response: "柳如煙立刻合上書包。「忘記帶課本又不是故意的，你不用這樣取笑我吧？」她整節課都沒有再主動和你說話。" }
-        ]
-    },
-    {
-        name: "柳如煙",
-        background: "classroom",
-        text: "下課時，柳如煙把共用的課本推回你面前。「謝謝你剛才借我看。要不是你，我大概會被老師罵了。」",
-        choices: [
-            { text: "笑著說沒關係", affection: 4, expression: "happy", response: "柳如煙笑了笑。「你人還不錯嘛。」說完，她似乎有點不好意思，低頭收拾桌面。" },
-            { text: "要求她以後一定要回報", affection: -3, expression: "angry", response: "柳如煙皺起眉頭。「我只是借看一下課本，又不是欠你什麼。」她把課本放回桌上，語氣明顯冷了下來。" }
-        ]
-    },
+
+    // 第 7 段：圖書館的舊書
     {
         name: "旁白",
         background: "library",
-        text: "午休時，你看到柳如煙坐在圖書館看書。陽光照在書頁上，她看得十分專心，甚至沒有注意到你走近。",
+        text: "放學前，你到圖書館尋找參考書。經過角落的書架時，你發現柳如煙正蹲著找一本舊校刊。她翻得很仔細，直到你走近才發現你在旁邊。",
         choices: [
-            { text: "等她讀完一段再詢問", affection: 6, expression: "happy", response: "柳如煙看完那一頁後抬起頭。「你想知道這本書的內容嗎？」她把封面轉向你，開始分享自己喜歡的部分。", special: "respect_boundaries" },
-            { text: "直接搶過她的書看", affection: -8, expression: "angry", response: "柳如煙迅速把書拿回來。「你為什麼不先問我？」她的聲音不大，卻明顯帶著怒氣。" }
+            {
+                text: "先打招呼，再問她在找什麼",
+                affection: 3,
+                expression: "happy",
+                response: "「我在找以前的校園活動紀錄。」柳如煙把書放回架上。「突然有點好奇以前的學校是什麼樣子。」",
+                special: "library_search"
+            },
+            {
+                text: "問她需不需要幫忙",
+                affection: 2,
+                expression: "normal",
+                response: "「不用啦，我快找到了。」柳如煙笑著回答。她合上手中的校刊，卻又忍不住回頭看了一眼。",
+                special: "noticed_year"
+            }
         ]
     },
-    {
-        name: "柳如煙",
-        background: "library",
-        text: "柳如煙聊到書裡的某個角色時，忽然露出期待的神情。「我覺得他最後做的決定很勇敢，你覺得呢？」",
-        choices: [
-            { text: "說出自己的想法，也聽她解釋", affection: 6, expression: "happy", response: "柳如煙和你討論了好一會兒。「原來你是這樣想的！跟你聊天還滿有意思的。」她第一次主動問你平常喜歡什麼。" },
-            { text: "直接說她的想法很幼稚", affection: -7, expression: "angry", response: "柳如煙的笑容消失了。「你不認同可以直接說，不用把我的想法講得那麼難聽。」她把書收起來，結束了話題。" }
-        ]
-    },
-    {
-        name: "旁白",
-        background: "playground",
-        text: "體育課分組時，柳如煙發現自己和不熟悉的同學分在一組。她看起來有些緊張，卻沒有開口求助。",
-        choices: [
-            { text: "主動和她一組，並互相配合", affection: 5, expression: "happy", response: "柳如煙看見你走過來，神情放鬆了一些。「那就麻煩你了，我可能沒那麼擅長這個活動。」你們開始一起練習。" },
-            { text: "當著大家的面說她一定會拖累人", affection: -8, expression: "angry", response: "柳如煙抿緊嘴唇。「我還沒開始做，你就知道我不行了嗎？」她不再看你，默默走到隊伍後面。" }
-        ]
-    },
-    {
-        name: "柳如煙",
-        background: "playground",
-        text: "活動結束後，柳如煙擦了擦額頭的汗。「剛才謝謝你配合我。雖然我有幾次沒做好，但還滿開心的。」",
-        choices: [
-            { text: "肯定她努力的地方", affection: 6, expression: "happy", response: "柳如煙露出真心的笑容。「你真的這樣覺得嗎？那我下次會再努力一點。」她看起來比平常更有精神。" },
-            { text: "只責怪她做得不夠好", affection: -6, expression: "angry", response: "柳如煙沉默了一下。「我已經盡力了。如果你只想責怪我，下次就不用一起了。」" }
-        ]
-    },
-    {
-        name: "旁白",
-        background: "classroom",
-        text: "隔天早上，你發現柳如煙比平常安靜。她坐在位置上看著窗外，桌上放著一張沒有寫完的筆記。",
-        choices: [
-            { text: "先詢問她今天還好嗎", affection: 5, expression: "normal", response: "柳如煙搖搖頭，又停了一下。「沒什麼，只是昨天沒睡好。」她似乎還不想多談，但願意回答你。" },
-            { text: "追問她到底在煩什麼", affection: -4, expression: "angry", response: "柳如煙皺起眉頭。「我說沒事就是沒事，可以不要一直問嗎？」她需要一點自己的空間。" }
-        ]
-    },
+
+    // 第 8 段：午餐的話題
     {
         name: "柳如煙",
         background: "classroom",
-        text: "午餐時間，柳如煙發現自己忘了帶餐具。她看著便當，苦惱地嘆了一口氣。",
+        text: "午餐時間，班上同學正熱烈討論週末要去哪裡玩。柳如煙安靜地聽著，偶爾點頭。當你問她的意見時，她似乎有些意外。",
         choices: [
-            { text: "問她需不需要幫忙借餐具", affection: 5, expression: "happy", response: "柳如煙抬起頭。「如果方便的話，可以麻煩你嗎？謝謝！」她接過餐具後，主動和你聊起今天的午餐。" },
-            { text: "笑她怎麼總是忘東忘西", affection: -5, expression: "angry", response: "柳如煙不高興地看著你。「每個人都會忘記事情吧？你一直講真的很煩。」" }
+            {
+                text: "邀請她週末一起去書店",
+                affection: 4,
+                expression: "happy",
+                response: "「書店嗎？好像不錯。」柳如煙想了一下。「如果時間可以，我很想去看看。」",
+                special: "invited_bookstore"
+            },
+            {
+                text: "問她平常最喜歡做什麼",
+                affection: 2,
+                expression: "normal",
+                response: "「看書、聽音樂，有時候也會出去散步。」她看向你。「那你呢？有沒有什麼特別喜歡的事情？」",
+                special: "asked_hobbies"
+            }
         ]
     },
+
+    // 第 9 段：放學後的約定
     {
         name: "旁白",
-        background: "classroom",
-        text: "午餐快結束時，柳如煙問起你平常放學後都做些什麼。這是她第一次主動詢問你生活中的事情。",
-        choices: [
-            { text: "認真分享自己的興趣，也問問她", affection: 6, expression: "happy", response: "柳如煙聽得很專心，接著也分享自己的興趣。「原來你喜歡這些！下次有機會可以再聊。」你們發現彼此有些共同點。", special: "shared_interest" },
-            { text: "只顧著說自己的事，不讓她插話", affection: -4, expression: "angry", response: "柳如煙等了一會兒，終於打斷你。「我也想說話，可以讓我講完嗎？」她有些不耐煩地低頭吃飯。" }
-        ]
-    },
-    {
-        name: "柳如煙",
-        background: "hallway", 
-        text: "放學前，柳如煙在走廊上追上你。「你明天會提早到學校嗎？我有一題數學題不太懂，想問問看。」",
-        choices: [
-            { text: "答應她，並約好明天一起看題目", affection: 6, expression: "happy", response: "柳如煙拿出筆記本記下來。「那明天見！我會先把題目整理好。」她揮揮手，走路的步伐似乎輕快了些。" },
-            { text: "隨口答應，卻沒把她的事放在心上", affection: -5, expression: "normal", response: "柳如煙點點頭。「好，那明天見。」她把筆記本收好，沒有察覺你其實沒打算赴約。" }
-        ]
-    },
-    {
-        name: "旁白",
-        background: "classroom",
-        text: "隔天早上，你來到教室，發現柳如煙已經坐在位置上等著。桌上放著整理好的數學題目。",
-        choices: [
-            { text: "準時赴約，陪她一起解題", affection: 8, expression: "happy", response: "柳如煙看見你準時出現，露出放心的笑容。「你真的來了！那我們從這一題開始吧。」你們一起討論，終於解開了題目。", special: "kept_promise" },
-            { text: "忘記約定，直到她提醒才想起", affection: -8, expression: "angry", response: "柳如煙看著你，語氣明顯失望。「你昨天明明答應我了……算了，我自己再研究看看。」她把題目收回去。" }
-        ]
-    },
-    {
-        name: "柳如煙",
-        background: "classroom",
-        text: "解完題目後，柳如煙忽然問你：「如果有一天朋友誤會了你，你會怎麼做？」她看起來不像是在問課本上的問題。",
-        choices: [
-            { text: "說明溝通的重要，也願意聽對方說", affection: 6, expression: "happy", response: "柳如煙安靜地聽著，最後點了點頭。「我也覺得，至少應該先聽對方說完。」她像是把你的話記在心裡。", special: "honest_communication" },
-            { text: "說不爽就不要再當朋友", affection: -6, expression: "angry", response: "柳如煙皺起眉頭。「可是有時候誤會不一定是故意的吧？什麼都不說就放棄，未免太可惜了。」" }
-        ]
-    },
-    {
-        name: "旁白",
-        background: "hallway", 
-        text: "某天下午，你無意間聽見其他同學談論柳如煙的事情。內容並不完整，你也不知道事情的真相。",
-        choices: [
-            { text: "不跟著傳話，直接向她確認", affection: 7, expression: "happy", response: "柳如煙聽完後，神情逐漸放鬆。「謝謝你願意先問我，而不是直接相信別人說的話。」她慢慢把事情的經過告訴你。", special: "trust" },
-            { text: "沒弄清楚就跟著別人議論她", affection: -10, expression: "angry", response: "柳如煙得知後，生氣地看著你。「你連事情都沒弄清楚，就跟著別人講我？」她轉身離開，暫時不想和你說話。" }
-        ]
-    },
-    {
-        name: "柳如煙",
         background: "hallway",
-        text: "隔天，柳如煙仍然有些在意昨天的事情。你們在走廊碰見，她停下腳步，似乎在等你先開口。",
+        text: "放學後，你和柳如煙一起走到樓梯口。她看著逐漸暗下來的天空，忽然問：「你覺得，一個人小時候喜歡的東西，長大以後還會喜歡嗎？」",
         choices: [
-            { text: "真誠道歉，承認自己沒有查清楚", affection: 7, expression: "normal", response: "柳如煙沉默了一會兒，才說：「我還是有點在意，但謝謝你願意道歉。希望下次你能先問清楚。」她沒有立刻恢復笑容，卻願意聽你說完。", special: "sincere_apology" },
-            { text: "覺得她太小題大作，反過來怪她", affection: -10, expression: "angry", response: "柳如煙的表情冷了下來。「你到現在還覺得是我的問題嗎？我不想再談了。」她轉身離開。" }
+            {
+                text: "回答有些喜歡的東西會一直保留下來",
+                affection: 3,
+                expression: "happy",
+                response: "柳如煙點了點頭。「我也這麼覺得。有些習慣就算很久沒做，也不會真的消失。」",
+                special: "believed_promise"
+            },
+            {
+                text: "回答人長大後可能會改變",
+                affection: 2,
+                expression: "normal",
+                response: "「也是。」柳如煙笑了笑。「所以偶爾回頭看看以前的自己，也滿有趣的。」",
+                special: "questioned_promise"
+            }
         ]
     },
+
+    // 第 10 段：雨中的熟悉感
     {
         name: "旁白",
         background: "rainy_school",
-        text: "放學時，天空突然下起大雨。柳如煙站在走廊，看著雨水打在地面上。她翻了翻書包，才發現自己忘了帶傘。",
+        text: "隔天下午，放學鐘聲響起時，天空突然下起大雨。你和柳如煙被困在教學樓的走廊。她望著雨幕，似乎很喜歡雨滴落在地面的聲音。",
         choices: [
-            { text: "詢問她的想法，提議一起等雨停", affection: 6, expression: "happy", response: "柳如煙想了想，點頭說：「好啊，反正雨也很大。」你們站在走廊，一開始只是看雨，後來才慢慢聊起生活中的小事。" },
-            { text: "不告而別，讓她自己想辦法", affection: -3, expression: "normal", response: "你收拾好東西先行離開。柳如煙看著你離去的方向，輕輕嘆了口氣，接著拿出手機查看公車時間。" }
+            {
+                text: "把傘借給她，自己留下等雨小一點",
+                affection: 3,
+                expression: "happy",
+                response: "柳如煙接過傘，卻沒有立刻離開。「那你怎麼辦？」她看著你，最後提議等雨小一點再走。",
+                special: "rain_memory"
+            },
+            {
+                text: "提議一起撐傘到公車站",
+                affection: 4,
+                expression: "happy",
+                response: "柳如煙愣了一下，隨後點頭。「好啊，那就麻煩你了。」兩人走進雨幕時，她輕輕哼起昨天那段旋律。",
+                special: "shared_umbrella"
+            }
         ]
     },
+
+    // 第 11 段：奇怪的夢
+    {
+        name: "旁白",
+        background: "classroom",
+        text: "那天晚上，你做了一個奇怪的夢。夢裡是一座有大樹的校園，你似乎正和某個人說話。但夢裡的聲音模糊不清，醒來後，你只記得那是一個讓人安心的地方。",
+        choices: [
+            {
+                text: "把夢裡的感覺記在手機備忘錄",
+                affection: 1,
+                expression: "normal",
+                response: "你記下了夢裡的大樹和模糊的聲音。寫完後，你覺得這大概只是普通的夢，便沒有再多想。",
+                special: "recorded_dream"
+            },
+            {
+                text: "不再多想，準備隔天上課",
+                affection: 2,
+                expression: "normal",
+                response: "你決定先把夢放在一邊。畢竟最近作業不少，也許只是太累了。",
+                special: "recalled_voice"
+            }
+        ]
+    },
+
+    // 第 12 段：她知道的事情
     {
         name: "柳如煙",
-        background: "rainy_school",
-        text: "雨勢漸漸變小。柳如煙看著你，像是猶豫了很久，才小聲說：「其實，跟你相處的這段時間，我覺得自己慢慢比較自在了。」",
+        background: "classroom",
+        text: "第二天早上，你到教室時，柳如煙已經坐在位置上。她看見你，忽然問：「你昨天睡得好嗎？」",
         choices: [
-            { text: "告訴她自己也很珍惜這段友誼", affection: 7, expression: "happy", response: "柳如煙露出有些害羞的笑容。「嗯……那我們以後也繼續好好相處吧。」她看向雨停後的天空，語氣比以前柔和許多。", special: "mutual_trust" },
-            { text: "立刻逼問她是不是喜歡自己", affection: -5, expression: "angry", response: "柳如煙嚇了一跳，接著皺起眉頭。「我只是想好好跟你相處，你為什麼要突然逼我回答這種問題？」她需要時間整理自己的心情。" }
+            {
+                text: "告訴她自己做了一個奇怪的夢",
+                affection: 3,
+                expression: "normal",
+                response: "柳如煙停下手中的動作。「夢嗎？」她很快恢復笑容。「我最近也常常做夢，大概是換了新環境的關係吧。」",
+                special: "mentioned_star"
+            },
+            {
+                text: "反問她為什麼突然問這個",
+                affection: 2,
+                expression: "normal",
+                response: "「沒什麼，只是看你今天好像有點累。」柳如煙把早餐放到桌上。「記得吃早餐，不然上課會沒精神。」",
+                special: "questioned_dream"
+            }
         ]
     },
+
+    // 第 13 段：校園裡的大樹
     {
         name: "旁白",
-        background: "event_classroom",
-        text: "幾天後，學校宣布即將舉辦班級活動。柳如煙拿著活動表走到你面前，問你願不願意和她一起準備。",
+        background: "playground",
+        text: "午休時，你經過操場旁的一棵老樹。柳如煙正站在樹下乘涼。微風吹過，她抬頭看著樹葉，神情難得放鬆。",
         choices: [
-            { text: "答應一起準備，並尊重彼此的想法", affection: 7, expression: "happy", response: "柳如煙開心地點頭。「太好了，那我們一起想辦法！」你們開始分工，也在討論中更加了解彼此。", special: "teamwork" },
-            { text: "要求她全部照自己的意思做", affection: -7, expression: "angry", response: "柳如煙把活動表收回去。「這是兩個人一起做的事情，不是只有你的想法才重要。」她決定先冷靜一下。" }
+            {
+                text: "走近詢問她為什麼喜歡這棵樹",
+                affection: 3,
+                expression: "normal",
+                response: "「這裡很安靜。」柳如煙說。「有時候來這裡待一下，心情就會好很多。」",
+                special: "old_tree"
+            },
+            {
+                text: "不打擾她，只在旁邊安靜地陪著",
+                affection: 4,
+                expression: "happy",
+                response: "你沒有追問，只在樹下陪她站了一會兒。柳如煙轉頭看著你，露出安心的笑容。「謝謝你，有時候安靜待著也很好。」",
+                special: "quiet_company"
+            }
         ]
-    }
+    },
+
+    // 第 14 段：臨時的邀請
+    {
+        name: "柳如煙",
+        background: "playground",
+        text: "放學後，柳如煙收拾好書包，走到你面前。「我想去附近的書店看看，你要一起去嗎？」她說完後，似乎有些在意你的回答。",
+        choices: [
+            {
+                text: "答應和她一起去",
+                affection: 4,
+                expression: "happy",
+                response: "「真的嗎？太好了。」柳如煙的笑容明顯變得燦爛。她和你約好時間，便先一步走向校門。",
+                special: "accepted_invitation",
+                flag: "accepted_invitation"
+            },
+            {
+                text: "婉拒邀請，表示今天有事",
+                affection: 0,
+                expression: "normal",
+                response: "柳如煙稍微愣了一下，隨後點頭。「沒關係，那下次有機會再一起去吧。」她雖然仍然微笑，卻沒有像剛才那麼雀躍。",
+                special: "declined_invitation",
+                flag: "declined_invitation"
+            }
+        ]
+    },
+
+    // 第 15 段：奇怪的巧合
+    {
+        name: "旁白",
+        background: "classroom",
+        text: "幾天後，你在整理課桌時，翻出一本自己很久以前用過的舊筆記本。裡面有幾頁字跡已經褪色，還畫著一些看不出意思的小圖案。你盯著其中一個星星圖案看了幾秒，卻想不起來是什麼時候畫的。這時，柳如煙剛好走進教室。",
+        choices: [
+            {
+                text: "把筆記本拿給柳如煙看",
+                affection: 3,
+                expression: "normal",
+                response: "柳如煙看著那個星星圖案，表情短暫地停頓了一下。「畫得滿可愛的。」她把筆記本還給你，沒有多問。",
+                special: "showed_notebook"
+            },
+            {
+                text: "把筆記本收好，問她今天的作業",
+                affection: 2,
+                expression: "happy",
+                response: "柳如煙被你突然轉移話題的樣子逗笑了。「你也太實際了吧。」她拿出課本，開始和你討論作業。",
+                special: "kept_notebook"
+            }
+        ]
+    },
+
+    // ==============================
+    // 第二章：照片裡的陌生人
+    // 正式謎題線索暫時不在這一章收集
+    // ==============================
+
+    // 第 16 段：整理教室
+    {
+        chapter: 2,
+        title: "照片裡的陌生人",
+        name: "旁白",
+        background: "classroom",
+        character: "柳如煙",
+        expression: "normal",
+        text: "學校準備整理一批舊教材，老師請幾位同學留下來幫忙。你和柳如煙負責整理教室後方的櫃子。翻找資料時，你們看到幾本年代久遠的校刊。柳如煙拿起其中一本，隨手翻了幾頁，又放回原處。",
+        choices: [
+            {
+                text: "問她以前的校園生活是不是很有趣",
+                affection: 2,
+                expression: "happy",
+                response: () => getStoryText(
+                "「應該吧。」柳如煙笑著說。「每個人的學生時代都有一些值得記住的事。」她把校刊放回櫃子，轉頭問你以前最喜歡哪一堂課。",
+                {
+                    accepted_invitation: "柳如煙笑著靠近你。「昨天和你一起出去的話，應該會很有趣吧。」她拿起校刊，主動和你聊起以前的校園生活。",
+                    declined_invitation: "柳如煙把校刊放回櫃子，禮貌地笑了笑。「以前的校園生活應該很有趣吧。」她沒有多聊昨天的邀請，而是繼續整理手上的教材。"
+                }
+            ),
+                special: "asked_about_school_days"
+            },
+            {
+                text: "專心整理教材，不多問其他事情",
+                affection: 1,
+                expression: "normal",
+                response: "你繼續把教材分類。柳如煙也沒有再說什麼，只是偶爾把整理好的書本遞給你。兩人配合得意外地順利。",
+                special: "organized_materials"
+            }
+        ]
+    },
+    // 第 17 幕
+    {
+        text: "放學後，教室裡的人逐漸散去。柳如煙還坐在位置上整理課本，窗外的夕陽落在她的筆記本上。你收拾好書包，正準備離開，她忽然抬起頭。",
+        choices: [
+            {
+                text: "主動問她要不要一起回家",
+                response: () => getStoryText(
+                    "「要一起走嗎？」你問。柳如煙愣了一下，隨即收起筆記本。「好啊，剛好我也準備走了。」",
+                    {
+                        accepted_invitation: "你問她要不要一起回家。柳如煙很自然地站起身：「好啊，反正上次也聊得滿開心的。」",
+                        declined_invitation: "你問她要不要一起回家。柳如煙稍微猶豫了一下，最後還是點頭：「可以啊。」你們之間仍留著一點尚未消散的尷尬。"
+                    }
+                ),
+                affection: 3,
+                flag: "walked_together"
+            },
+            {
+                text: "跟她打聲招呼就先離開",
+                response: "你向柳如煙揮了揮手，背起書包離開教室。她也向你道別，隨後低下頭繼續整理東西。",
+                affection: 0,
+                flag: "left_after_school"
+            }
+        ]
+    },
+
+    // ==============================
+    // 第 18 幕
+    // ==============================
+    {
+        text: "隔天早上，教室裡比平常熱鬧。有人正在討論週末的安排，柳如煙則安靜地翻閱一本校園刊物。當你經過她的座位時，她抬頭看了你一眼。",
+        choices: [
+            {
+                text: "問她正在看什麼",
+                response: "「這個嗎？」柳如煙把刊物稍微轉向你。「是以前學校辦活動時留下來的紀錄，沒想到裡面有這麼多有趣的事情。」她指著其中一張校園照片，和你聊起學校以前的活動。",
+                affection: 2,
+                flag: "discussed_school_history"
+            },
+            {
+                text: "和同學聊別的事情",
+                response: "你轉身加入同學們的話題。柳如煙看了你一眼，沒有打擾你，繼續翻閱手中的刊物。",
+                affection: 0,
+                flag: "ignored_school_history"
+            }
+        ]
+    },
+
+    // ==============================
+    // 第 19 幕
+    // ==============================
+    {
+        text: "午休時，柳如煙拿著一本筆記本來到座位旁。她似乎想詢問你某件事，卻又停頓了一下，最後只是把筆記本放在桌上。",
+        choices: [
+            {
+                text: "問她是不是有話想說",
+                response: "「你怎麼知道？」柳如煙有些驚訝，接著笑了笑。「其實沒什麼，只是想問你，平常心情不好的時候都會做什麼？」她沒有催促你回答，只是安靜地等著。",
+                affection: 3,
+                flag: "asked_her_feelings"
+            },
+            {
+                text: "等她自己開口",
+                response: "你沒有追問，只是繼續整理桌上的東西。過了一會兒，柳如煙像是放棄了原本的念頭，拿起筆記本回到自己的位置。",
+                affection: 0,
+                flag: "waited_for_her"
+            }
+        ]
+    },
+
+    // ==============================
+    // 第 20 幕
+    // ==============================
+    {
+        text: "放學前，天空忽然暗了下來。窗外傳來細碎的雨聲，同學們紛紛拿出雨傘。柳如煙停下手邊的動作，望向窗外，似乎比平常多看了一會兒。",
+        choices: [
+            {
+                text: "問她喜不喜歡下雨天",
+                response: "「下雨天嗎？」柳如煙望著窗外，輕輕笑了笑。「我其實滿喜歡雨聲的，尤其是安靜的時候。」她說完便拿起書包，像是覺得這只是個再普通不過的話題。",
+                affection: 2,
+                flag: "talked_about_rain"
+            },
+            {
+                text: "提醒她別忘記帶傘",
+                response: "你提醒柳如煙帶傘。她低頭看了看自己的書包，這才發現忘了準備。「還好你有提醒我，謝謝。」她向你道謝，接著開始思考該怎麼回家。",
+                affection: 2,
+                flag: "reminded_her_umbrella"
+            }
+        ]
+    },
+
+    // ==============================
+    // 第 21 幕
+    // ==============================
+    {
+        text: "雨勢逐漸變小。你和柳如煙在校門附近遇見，她正站在屋簷下看著遠處的天空。聽見你的腳步聲，她轉過頭，神情恢復了平常的模樣。",
+        choices: [
+            {
+                text: "邀請她一起走到車站",
+                response: () => getStoryText(
+                    "「一起走吧。」你說。柳如煙點點頭，與你並肩走出校門。一路上，你們聊著學校的事情，偶爾停下來看一眼路旁被雨水洗亮的樹葉。",
+                    {
+                        walked_together: "「又遇到了啊。」柳如煙笑著走到你身旁。你們一邊走，一邊接續昨天沒聊完的話題。",
+                        left_after_school: "柳如煙看見你後，禮貌地向你打招呼。聽見你的邀請，她猶豫了一下，才拿起雨傘跟上你的腳步。"
+                    }
+                ),
+                affection: 3,
+                flag: "walked_to_station"
+            },
+            {
+                text: "向她道別，自己先回家",
+                response: "你向柳如煙道別，獨自走進雨後的街道。她站在屋簷下向你揮手，直到你走遠，才轉身離開。",
+                affection: 0,
+                flag: "went_home_alone"
+            }
+        ]
+    },
 ];
 
 // ========================================
@@ -344,6 +978,11 @@ function startGame() {
     hasChosen = false;
     hiddenEndingUnlocked = false;
     specialChoices.clear();
+    storyFlags.clear();
+    discoveredClues.clear();
+    solvedPuzzles.clear();
+
+    relationshipStage = "normal";
     currentText = "";
     endingCg.style.display = "none";
     endingCg.classList.remove("show-ending", "fade-out");
@@ -496,17 +1135,34 @@ function showStoryChoices(choices) {
                 specialChoices.add(choice.special);
             }
 
-            // 隱藏結局條件：
-            // 至少三種特殊選擇、好感度至少 75，
-            // 最後一段選擇 teamwork
+            // 記錄這次選擇，供後續劇情判斷
+            if (choice.flag) {
+                storyFlags.add(choice.flag);
+            }
+
+                // 根據目前好感度更新關係狀態
+                updateRelationshipStage();
+
+
+            // 收集解謎線索
+            if (choice.clue) {
+                collectClue(choice.clue);
+            }
+
+
+            // 隱藏結局條件：必須收集線索、解開謎題，並做出正確選擇
             if (
-                specialChoices.size >= 3 &&
-                affection >= 75 &&
+                discoveredClues.has("old_photo") &&
+                discoveredClues.has("mysterious_letter") &&
+                discoveredClues.has("past_memory") &&
+                solvedPuzzles.has("photo_date") &&
+                solvedPuzzles.has("letter_secret") &&
                 currentSceneIndex === totalScenes - 1 &&
                 choice.special === "teamwork"
             ) {
                 hiddenEndingUnlocked = true;
             }
+
 
             changeCharacter(choice.expression);
 
@@ -516,8 +1172,12 @@ function showStoryChoices(choices) {
             container.style.display = "none";  
 
             updateAffection();
-            typeDialogue(choice.response);
-        });
+            const responseText =
+        typeof choice.response === "function"
+            ? choice.response()
+            : choice.response;
+            typeDialogue(responseText);
+            });
 
         container.appendChild(button);
     });
@@ -719,6 +1379,11 @@ function restartGame(playMenuAnimation = true) {
     hasChosen = false;
     hiddenEndingUnlocked = false;
     specialChoices.clear();
+    storyFlags.clear();
+    discoveredClues.clear();
+    solvedPuzzles.clear();
+
+    relationshipStage = "normal";
     currentText = "";
     endingCgStep = 0;
 
@@ -1120,7 +1785,7 @@ gameScreen.addEventListener("click", function (event) {
     nextDialogue();
 });
 
-function saveGame() {
+function saveGame() {   
     if (
         currentSceneIndex < 0 ||
         currentSceneIndex >= storyScenes.length
@@ -1136,6 +1801,10 @@ function saveGame() {
         currentSceneIndex: currentSceneIndex,
         hiddenEndingUnlocked: hiddenEndingUnlocked,
         specialChoices: Array.from(specialChoices),
+        discoveredClues: Array.from(discoveredClues),
+        solvedPuzzles: Array.from(solvedPuzzles),
+        storyFlags: Array.from(storyFlags),
+        relationshipStage: relationshipStage,
         savedAt: new Date().toLocaleString("zh-TW")
     };
 
@@ -1158,7 +1827,7 @@ function saveGame() {
     document.getElementById("save-status").textContent =
     "上次存檔：" + saveData.savedAt;
     alert("遊戲進度已保存！");
-    }
+}
 
 
 function loadGame() {
@@ -1203,6 +1872,36 @@ function loadGame() {
         hiddenEndingUnlocked =
             saveData.hiddenEndingUnlocked === true;
         specialChoices = new Set(saveData.specialChoices);
+        // 恢復已收集的線索
+        discoveredClues = new Set(
+            Array.isArray(saveData.discoveredClues)
+                ? saveData.discoveredClues.filter(
+                    clueId => Object.prototype.hasOwnProperty.call(clueData, clueId)
+                )
+                : []
+        );
+        
+        // 恢復已解開的謎題
+        solvedPuzzles = new Set(
+            Array.isArray(saveData.solvedPuzzles)
+                ? saveData.solvedPuzzles.filter(
+                    puzzleId => ["photo_date", "letter_secret", "childhood_promise"].includes(puzzleId)
+                )
+                : []
+        );
+
+        // 還原玩家的劇情選擇紀錄
+        storyFlags = new Set(
+            Array.isArray(saveData.storyFlags)
+                ? saveData.storyFlags
+                : []
+        );
+
+        // 還原角色關係狀態
+        relationshipStage =
+            saveData.relationshipStage || "normal";
+
+
 
         hasChosen = false;
 
