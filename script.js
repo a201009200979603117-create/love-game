@@ -390,7 +390,6 @@ const textSpeedLabels = {
     5: "非常快"
 };
 
-const totalScenes = 21;
 const MAX_AFFECTION = 100;
 
 // ========================================
@@ -2660,8 +2659,731 @@ const storyScenes = [
             }
         ]
     },
-];
+    // ==============================
+    // 第 53 幕：樹下的最後一句話
+    // ==============================
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "old_neighborhood_park",
+        character: "柳如煙",
+        expression: "thinking",
+        text: "週末，你陪柳如煙回到那座老公園。老樹還在，只是枝葉比記憶中稀疏了許多。她站在樹下，閉上眼睛，試著回想當年和男孩分開前的情景。起初只有模糊的笑聲，接著是雨水落在地面的聲音，以及一雙沾著泥土的鞋。她忽然睜開眼睛，說自己想起了那天的一個細節：男孩離開之前，曾把一張折好的紙交給她，叮囑她不要急著打開，要等到自己真的找不到他時再看。可是她的記憶到這裡便中斷了。她不知道那張紙究竟是信件，還是另一張寫著約定的紙條。你看著老樹下的石椅，忽然覺得這個地方與夢境裡的景象重疊在一起。",
+        choices: [
+            {
+                text: "陪她坐在石椅上，慢慢回想當天的情景",
+                affection: 3,
+                trust: 3,
+                expression: "sad",
+                response: () => {
+                    if (storyFlags.has("listened_to_rain_together") && storyFlags.has("recalled_first_promise")) {
+                        return "你們坐在石椅上，安靜地聽著風穿過樹葉的聲音。柳如煙漸漸想起，男孩當時曾說：「如果你以後想不起我的樣子，就先記住我們說好的事情。」她終於明白，自己一直記得的不是一張臉，而是一個承諾。她轉頭看向你，卻沒有急著把你和那個男孩畫上等號。「我還差最後一段記憶，」她說，「但我覺得，我們已經很接近了。」";
+                    }
 
+                    return "你沒有催促她，只陪她坐在樹下。柳如煙逐漸想起當天的天空、石椅的位置，以及男孩離開前的神情，卻仍然想不起他的臉。她說，自己或許需要找到當年留下的其他紀錄，才能把最後的片段接起來。";
+                },
+                special: "sat_under_old_tree",
+                flag: "sat_under_old_tree"
+            },
+            {
+                text: "沿著老樹周圍尋找，看看是否還有被留下的記號",
+                affection: 1,
+                trust: 2,
+                expression: "normal",
+                response: () => {
+                    if (storyFlags.has("searched_old_tree") || storyFlags.has("compared_box_star")) {
+                        return "你們沿著樹根和石椅仔細查看，沒有破壞任何東西。柳如煙在石椅底部看見先前拍過的星星記號，旁邊還有一道很淺的刻痕，像是某個字的開頭，但已經無法辨認。她把照片放大，發現刻痕旁有一個小小的日期標記。這個日期或許能和活動名冊互相核對，成為確認當年經過的另一項證據。";
+                    }
+
+                    return "你們在老樹附近找了一會兒，沒有發現新的物品。柳如煙倒是注意到石椅底部有一道很淺的刻痕，於是拍下照片留作紀錄。她認為，在沒有更多證據之前，不應該把普通的刻痕當成確定的線索。";
+                },
+                special: "checked_tree_mark_again",
+                flag: "checked_tree_mark_again"
+            }
+        ]
+    },
+    // ==============================
+    // 第 54 幕：被遮住的名字
+    // ==============================
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "old_center_archive",
+        character: "柳如煙",
+        expression: "surprised",
+        text: "你和柳如煙帶著石椅上的日期照片，再次回到活動中心。老先生翻出當年的活動紀錄，逐一核對後，終於找到相近的日期。那一天確實有一場觀星活動，結束後還有兩名孩子留在公園附近。紀錄旁邊畫著一顆小星星，與你們找到的信封圖案十分相似。然而，登記表上的其中一個名字被水漬完全遮住，另一個名字也只剩下幾個難以辨認的筆畫。老先生說，當年有些資料曾被重新抄寫，原件可能還保存在另一個地方。柳如煙看著那片空白，沒有像以前那樣急著猜測。她輕聲說：「我們已經知道那一天真的發生過，也找到留下來的約定。現在只差能確認身分的證據。」",
+        choices: [
+            {
+                text: "請老先生尋找當年的原始登記表",
+                affection: 2,
+                trust: 3,
+                expression: "normal",
+                response: () => {
+                    if (storyFlags.has("matched_attendance_record") || storyFlags.has("recorded_event_date")) {
+                        return "老先生根據你們記下的日期與名冊編號，找到一份尚未整理完成的舊文件清單。清單顯示，部分原始登記表曾移交給另一個保存單位，但沒有記下確切的收件人。他答應幫忙查詢移交紀錄。柳如煙把這項發現寫進筆記，說：「我們不是毫無頭緒了。只要找到原件，也許就能看清那些名字。」";
+                    }
+
+                    return "老先生答應幫忙，但因為缺少確切的日期與編號，暫時無法縮小搜尋範圍。你們先將這次找到的活動日期和星星記號記錄下來，準備再核對一次舊名冊。";
+                },
+                special: "requested_original_roster",
+                flag: "requested_original_roster"
+            },
+            {
+                text: "先比較星星記號，確認幾份資料是否屬於同一場活動",
+                affection: 1,
+                trust: 3,
+                expression: "thinking",
+                response: () => {
+                    if (storyFlags.has("examined_letter_star") && storyFlags.has("compared_box_star")) {
+                        return "你把信封、鐵盒紙條、活動紀錄上的星星圖案依序排好。雖然每個圖案都有些不同，但那個特別長的角一再出現，旁邊的標記位置也有相似之處。老先生確認這幾份資料的保存年代相近，認為它們很可能與同一系列活動有關。不過，他提醒你們，圖案只能證明資料之間存在關聯，還不能單靠它認定某個人的身分。";
+                    }
+
+                    return "你們逐一記錄不同文件上的星星圖案，發現其中一些細節相似，但現有的比較資料還不夠完整。柳如煙決定先把照片整理好，等找到更多原始文件後再進一步確認。";
+                },
+                special: "compared_activity_symbols",
+                flag: "compared_activity_symbols"
+            }
+        ]
+    },
+    // ==============================
+    // 第 55 幕：移交紀錄的最後一站
+    // ==============================
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "old_center_office",
+        character: "老管理員",
+        expression: "normal",
+        text: "幾天後，老先生終於查到一筆較完整的移交紀錄。當年的部分活動資料，在整理時被送往附近的地方文史資料室保存，其中就包含原始參加者名冊。你和柳如煙立刻記下地址，準備前往查詢。出發前，老先生又拿出一張舊工作便條。便條上寫著：「若有人回來尋找那一天，請先確認他是否知道星空的約定。」柳如煙看著這句話，神情變得複雜。她說，這不像一般的資料整理備註，更像是有人特別留下來的一句提醒。你讀著那行字，腦海裡忽然閃過夢境中男孩的聲音，彷彿他曾經說過相似的話。可是，你仍然無法確定那段記憶究竟從何而來。",
+        choices: [
+            {
+                text: "詢問老先生，這張便條是誰留下的",
+                affection: 2,
+                trust: 3,
+                expression: "thinking",
+                response: () => {
+                    if (storyFlags.has("requested_original_roster")) {
+                        return "老先生仔細回想後說，這張便條是在整理原始名冊時發現的，當時沒有人能確認是誰寫的。他只記得寫字的人似乎很熟悉那場活動，特別在意有一天是否會有人回來尋找當年的約定。柳如煙將便條的筆跡拍下，決定日後和信件上的字跡比較，但她提醒你，字跡相似也不一定代表出自同一人。";
+                    }
+
+                    return "老先生說，便條是整理舊資料時偶然發現的，沒有署名，也沒有留下日期。他建議你們先找到原始名冊，再回頭確認便條的來歷。";
+                },
+                special: "investigated_roster_note",
+                flag: "investigated_roster_note"
+            },
+            {
+                text: "把便條上的話記下，直接前往文史資料室",
+                affection: 3,
+                trust: 2,
+                expression: "normal",
+                response: () => {
+                    if (storyFlags.has("honored_promises") || storyFlags.has("recalled_first_promise")) {
+                        return "你把便條上的話抄進筆記，尤其圈起「星空的約定」幾個字。柳如煙看著你的筆記，輕聲說：「我們一直在找的，也許不只是一個名字，而是那個人為什麼要留下這些東西。」你們決定先找到原始名冊，讓真正的紀錄回答問題，而不是只靠自己的猜測。";
+                    }
+
+                    return "你將便條妥善收好，與柳如煙一起前往文史資料室。你們希望先找到完整的名冊，再判斷這張便條與當年的事件有什麼關係。";
+                },
+                special: "headed_to_history_archive",
+                flag: "headed_to_history_archive"
+            }
+        ]
+    },
+    // ==============================
+    // 第 56 幕：原始名冊上的名字
+    // ==============================
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "local_history_archive",
+        character: "柳如煙",
+        expression: "surprised",
+        text: "地方文史資料室比你想像中安靜，架上放滿了泛黃的文件與舊照片。工作人員依照你們提供的日期和移交編號，找出一冊保存完整度較高的原始名冊。柳如煙翻到星空活動那一頁，終於看見當年參加者的完整登記欄。那一天確實有兩名孩子在活動結束後留下，其中一人的名字旁畫著一顆星星，另一人則在備註欄留下了幾個字：「約定之地，日後再見。」然而，名字旁邊的紙張曾經被撕去一小角，最後一個字仍然看不清楚。你盯著那行字，心中湧起一股難以言喻的熟悉感。柳如煙沒有急著下結論，只把名冊上的內容逐字抄錄下來。她說：「我們終於找到原始紀錄了。只要再找到能補上缺角的資料，也許就能確認那個男孩是誰。」",
+        choices: [
+            {
+                text: "核對名冊的備註，找出與童年約定相符的內容",
+                affection: 2,
+                trust: 3,
+                expression: "thinking",
+                response: () => {
+                    if (storyFlags.has("recorded_childhood_memory") && storyFlags.has("recalled_first_promise")) {
+                        return "你把夢境中記得的約定，與名冊上的備註逐字比對。兩者都提到日後重逢，也都與那片星空有關。柳如煙看著紀錄，想起自己曾經問過男孩：「如果我們忘記彼此了，怎麼辦？」這些相似之處讓你們更接近答案，但她仍提醒你，約定相同不代表身分就已經獲得證明。";
+                    }
+
+                    return "你們逐字抄下備註，發現它確實與尋找約定的方向相符，但目前還無法與自己的記憶完全對上。柳如煙將相關頁碼記下，準備繼續查找當年的其他文件。";
+                },
+                special: "matched_roster_promise",
+                flag: "matched_roster_promise"
+            },
+            {
+                text: "詢問工作人員，是否有名冊缺角的原始照片",
+                affection: 1,
+                trust: 3,
+                expression: "normal",
+                response: () => {
+                    if (storyFlags.has("requested_original_roster") || storyFlags.has("headed_to_history_archive")) {
+                        return "工作人員查詢了數位化資料，找到一張當年整理名冊時拍攝的照片。照片中的紙張還沒有被撕去一角，但影像解析度有限，最後一個字依舊模糊。你們將照片與現在的名冊並排保存，確認缺角是在後來整理時才出現的。工作人員表示，或許還有其他活動照片能補足這項資訊。";
+                    }
+
+                    return "工作人員表示，資料室曾經拍攝過部分舊文件，但需要更精確的年份與活動編號才能找到。你們先記下目前的名冊資料，準備再核對其他線索。";
+                },
+                special: "found_roster_scan",
+                flag: "found_roster_scan"
+            }
+        ]
+    },
+    // ==============================
+    // 第 57 幕：照片裡的第二個人
+    // ==============================
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "local_history_archive",
+        character: "柳如煙",
+        expression: "surprised",
+        text: "工作人員帶你們到另一排資料櫃，找出當年星空活動的照片集。照片裡有許多孩子站在觀測台旁，有人拿著星圖，有人正對著鏡頭笑。翻到最後幾張時，你們看見兩個孩子站在老樹下，其中一個女孩手裡拿著一張折好的紙，另一個男孩則低頭看著她畫的星星。照片背面寫著活動日期，旁邊還有一行小字：「兩位參加者，活動結束後自行離開。」柳如煙望著照片，呼吸變得急促。女孩的身形和她記憶中的自己十分相似，而男孩的臉卻被照片上的一道刮痕遮住。你盯著男孩的手，忽然注意到他正在無意識地輕敲手指。那個動作，竟然和你思考時的習慣一模一樣。",
+        choices: [
+            {
+                text: "把男孩的手部動作與自己的習慣仔細比較",
+                affection: 2,
+                trust: 3,
+                expression: "thinking",
+                response: () => {
+                    if (storyFlags.has("noticed_finger_tapping") || storyFlags.has("connected_tapping_memory")) {
+                        return "你看著照片裡男孩的手指，想起自己思考時也總會做出相同的動作。柳如煙說，她記得那個男孩確實有這個習慣，而且每當他不知道該怎麼回答時，手指就會輕輕敲動。這項相似之處讓你們都沉默了。她最後說：「這是很重要的線索，但我還想找到更多能證明身分的東西。」";
+                    }
+
+                    return "你仔細觀察照片，發現男孩的手指確實有輕敲的姿勢，但單憑一張舊照片，還不能判斷這是否就是你的習慣。你把照片的細節記錄下來，決定再尋找其他能相互印證的證據。";
+                },
+                special: "compared_tapping_in_photo",
+                flag: "compared_tapping_in_photo"
+            },
+            {
+                text: "把照片交給柳如煙，請她說說女孩的記憶",
+                affection: 3,
+                trust: 3,
+                expression: "sad",
+                response: () => {
+                    if (storyFlags.has("recalled_first_promise") || storyFlags.has("recalled_childhood_voice")) {
+                        return "柳如煙仔細看著照片，終於想起女孩手裡拿著的紙。她說，那天男孩把紙交給她時，曾提醒她要記住星星的畫法。她還記得自己問過：「如果有一天我們真的認不出彼此呢？」男孩沒有回答名字，只說：「那就把我們留下的事情一件件找回來。」柳如煙抬頭看向你，眼神裡既有期待，也有不安。";
+                    }
+
+                    return "柳如煙努力回想女孩當時的心情，只記得自己似乎非常珍惜手中的紙。她仍然無法看清男孩的臉，但照片讓她確信，那一天確實是自己記憶中的重要時刻。她決定繼續找尋其他資料，不讓猜測取代真正的答案。";
+                },
+                special: "recalled_photo_moment",
+                flag: "recalled_photo_moment"
+            }
+        ]
+    },
+    // ==============================
+    // 第 58 幕：被折起來的另一半
+    // ==============================
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "local_history_archive",
+        character: "柳如煙",
+        expression: "thinking",
+        text: "你們向工作人員詢問照片中那張折紙的下落。對方查閱了活動物品的保存紀錄，找到一份當年拍攝的物品清單。清單裡記載，活動結束後曾留下兩份紙件：一封未寄出的信，以及一張寫著觀星約定的折紙。信件後來被放進私人紀念物的紙盒，而折紙則被記錄為「交由參加者自行保管」。柳如煙看著這段文字，忽然想起自己小時候確實把一張紙收得很仔細，卻不記得後來放在了哪裡。你們繼續查看清單，發現折紙上曾寫著一句話：「如果忘記了，就從第一顆星開始找。」柳如煙低聲重複這句話，彷彿那是一段已經遺失很久、卻一直留在心底的聲音。",
+        choices: [
+            {
+                text: "把折紙上的句子與信件內容逐字比對",
+                affection: 2,
+                trust: 3,
+                expression: "normal",
+                response: () => {
+                    if (storyFlags.has("discovered_letter") || storyFlags.has("organized_letter_together") || storyFlags.has("verified_old_envelope")) {
+                        return "你把折紙的紀錄與信件抄本放在一起，發現兩者都提到忘記彼此後，仍然能循著星星找到約定。信裡提到北方第三顆星，折紙卻說從第一顆星開始找。柳如煙想了想，認為這可能是尋找的順序，而不是兩個互相矛盾的提示。你們把這個差異記下，決定回到舊星圖，確認兩種說法如何連在一起。";
+                    }
+
+                    return "你們將折紙上的句子抄錄下來，發現它與信件所描述的約定十分相似，但目前還沒有完整的信件內容可以比較。柳如煙決定先保存這項紀錄，等確認信件後再找出兩者的關聯。";
+                },
+                special: "compared_paper_and_letter",
+                flag: "compared_paper_and_letter"
+            },
+            {
+                text: "追查折紙最後由誰保管，確認它是否還存在",
+                affection: 1,
+                trust: 3,
+                expression: "thinking",
+                response: () => {
+                    if (storyFlags.has("found_roster_scan") || storyFlags.has("requested_original_roster")) {
+                        return "工作人員依照物品清單的編號，找到一份後來補寫的備註：「紙件已由其中一位參加者帶離，未留存姓名。」這表示折紙很可能沒有被收進資料室，而是一直由某個人保管。柳如煙沉默了一會兒，說：「如果那張紙真的在我家裡，也許我只是忘了它放在哪裡。」你們決定先把這筆紀錄交給她，讓她回去尋找時有更明確的方向。";
+                    }
+
+                    return "工作人員確認，折紙當年被其中一位參加者帶走，但紀錄沒有留下姓名。柳如煙覺得自己或許曾經保管過它，卻無法確定。你們把編號與備註記下，準備繼續追查。";
+                },
+                special: "traced_folded_paper",
+                flag: "traced_folded_paper"
+            }
+        ]
+    },
+    // ==============================
+    // 第 59 幕：抽屜深處的折紙
+    // ==============================
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "ruyan_childhood_room",
+        character: "柳如煙",
+        expression: "surprised",
+        text: "週末，柳如煙傳訊息告訴你，她在家裡找到了一個很久沒打開的木製抽屜。裡面放著童年的照片、褪色的貼紙，以及幾張被折得整整齊齊的紙。她邀請你一起確認，因為她擔心自己會把記憶和想像混在一起。你來到她家後，她將其中一張紙慢慢攤開。紙上畫著一片簡單的星空，北方的星列旁有一道藍色記號，角落還寫著：「如果忘記了，就從第一顆星開始找。」這正是你們在活動紀錄中讀到的句子。紙張背面有一行稚嫩的字：「給長大以後的我們。」柳如煙看著那行字，眼神逐漸濕潤。她說，這張紙一直被自己留著，卻因為搬家而被遺忘在抽屜深處。她終於明白，自己並沒有完全失去那段回憶，只是忘了該從哪裡開始尋找。",
+        choices: [
+            {
+                text: "把折紙與信件的內容放在一起，重新整理約定",
+                affection: 2,
+                trust: 3,
+                expression: "normal",
+                response: () => {
+                    if (storyFlags.has("compared_paper_and_letter") && discoveredClues.has("mysterious_letter")) {
+                        return "你們將折紙與信件抄本並排放好。信裡提到北方第三顆星，折紙則提示從第一顆星開始找。你們重新對照舊星圖，發現第一顆星是辨認方位的起點，第三顆星才是兩人約定要一起觀看的那顆。柳如煙終於理解，兩份紙件其實是在告訴未來的自己如何一步步找回約定。她把這個結果寫進筆記，並決定將兩份紙件妥善保存。";
+                    }
+
+                    return "你們將折紙上的文字仔細抄下，與目前找到的線索逐一比對。雖然還沒能完整解開兩份紙件的關係，但已經確認它們都指向同一個童年約定。柳如煙決定保留原件，等找到更多證據後再繼續整理。";
+                },
+                special: "reconstructed_promise",
+                flag: "reconstructed_promise"
+            },
+            {
+                text: "問她看到這張紙時，是否想起男孩的模樣",
+                affection: 3,
+                trust: 2,
+                expression: "sad",
+                response: () => {
+                    if (storyFlags.has("recalled_photo_moment") || storyFlags.has("recalled_childhood_voice")) {
+                        return "柳如煙望著折紙上的字，努力回想那天的情景。她想起男孩把紙交給她時，手指曾輕輕敲了幾下，然後笑著說：「如果忘記了，就把留下的事情找回來。」她仍然看不清他的臉，卻記得那個聲音帶著一點緊張，又很認真。她看向你，發現你思考時也會做出相似的手指動作。她沒有立刻說出自己的猜測，只輕聲問：「你真的不覺得這些事情很熟悉嗎？」";
+                    }
+
+                    return "柳如煙閉上眼睛，努力回想男孩的模樣，卻依然只能看見模糊的輪廓。她說，這張紙讓她確定自己曾經非常珍惜那個約定，但她不願意因為急著找到答案，就把任何相似的人認成他。";
+                },
+                special: "asked_about_folded_paper_memory",
+                flag: "asked_about_folded_paper_memory"
+            }
+        ]
+    },
+    // ==============================
+    // 第 60 幕：夢境裡的最後一塊拼圖
+    // ==============================
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "childhood_memory_rain",
+        character: "柳如煙",
+        expression: "thinking",
+        text: "那天晚上，你又夢見了老樹與星空。這一次，夢境比以前清楚得多。年幼的男孩坐在石椅上，一邊聽著雨聲，一邊用手指輕敲膝蓋。女孩把畫好的星星遞給他，笑著說：「你每次想事情都會這樣敲手指，真的改不掉。」男孩不好意思地停下動作，接著拿出一張折紙，說要把兩人的約定留下來。女孩問他：「如果長大以後，我們真的認不出彼此呢？」男孩沉默片刻，才回答：「那就不要只看臉。記住我們說過的話，還有一起留下的東西。」就在女孩準備說出下一句話時，夢境突然中斷。你醒來後，發現自己不自覺地敲著手指，心裡第一次浮現一個清晰的念頭：那個男孩可能就是自己。",
+        choices: [
+            {
+                text: "把夢裡的每個細節寫下來，再與舊紀錄比對",
+                affection: 2,
+                trust: 3,
+                expression: "normal",
+                response: () => {
+                    if (storyFlags.has("recorded_childhood_memory") && storyFlags.has("compared_tapping_in_photo")) {
+                        return "你將新夢境與之前記錄的片段放在一起，發現手指敲動的習慣、星星的畫法，以及男孩說過的約定，都能在舊照片和紙件中找到相似之處。這些線索彼此呼應，卻仍然缺少一個能確認身分的直接證據。你決定把夢境的日期和內容保存下來，避免日後因為情緒而記錯細節。";
+                    }
+
+                    return "你將夢境中的場景、對話和動作逐一記下。雖然它讓你感到非常熟悉，但夢境本身還不能證明那是真實的童年記憶。你決定先保留紀錄，再找其他證據核對。";
+                },
+                special: "documented_final_dream",
+                flag: "documented_final_dream"
+            },
+            {
+                text: "立刻聯絡柳如煙，告訴她夢裡想起的話",
+                affection: 3,
+                trust: 3,
+                expression: "normal",
+                response: () => {
+                    if (storyFlags.has("shared_childhood_memory") || storyFlags.has("connected_dream_to_letter")) {
+                        return "你把夢裡那句「不要只看臉，要記住我們說過的話」告訴柳如煙。電話另一端安靜了很久，她才說，這句話和她從折紙、信件中找回的約定十分相似。她沒有急著確認你的身分，只問你是否還記得其他細節。你坦白自己仍然看不清男孩的臉，但這次的夢境比以前更完整。柳如煙輕聲說：「那我們就一起把最後的證據找出來。」";
+                    }
+
+                    return "柳如煙聽完你的描述後，表示其中幾個細節與她的記憶相似，但她不希望你們只靠夢境就認定結果。她答應隔天一起整理所有已經找到的資料，再決定下一步該查什麼。";
+                },
+                special: "shared_final_dream",
+                flag: "shared_final_dream"
+            }
+        ]
+    },
+    // ==============================
+    // 第 61 幕：所有線索的交會點
+    // ==============================
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "school_library_evening",
+        character: "柳如煙",
+        expression: "thinking",
+        text: "放學後，你和柳如煙借了圖書館的一張桌子，把一路找到的資料全部攤開：舊照片、活動名冊、保存紀錄、信件抄本、折紙，以及星圖的照片。你們先確認活動日期，再核對星星符號與藍色記號，接著將信件和折紙中的句子逐字比對。原本看似毫無關聯的細節，開始慢慢連成一條清楚的線。第一顆星用來辨認方向，北方第三顆星才是兩人約定要一起觀看的目標；特殊的長角星星則是女孩留下的記號。柳如煙望著桌面，終於說：「我以前一直以為，只要想起他的臉，就能找到他。可是我們真正找到的，是他留下來的每一件事情。」她抬頭看向你，目光停留了片刻。「現在，我想知道的不是你像不像他，而是你還記不記得，那一天最後發生了什麼。」",
+        choices: [
+            {
+                text: "依照日期、星圖與紙件順序，重新整理整段約定",
+                affection: 2,
+                trust: 3,
+                expression: "normal",
+                response: () => {
+                    if (
+                        discoveredClues.has("old_photo") &&
+                        discoveredClues.has("mysterious_letter") &&
+                        storyFlags.has("compared_paper_and_letter") &&
+                        storyFlags.has("reconstructed_promise")
+                    ) {
+                        return "你們按照時間順序整理資料：先是觀星活動，接著是老樹下的約定，再來是寫給未來彼此的信與折紙。信件中的北方第三顆星、折紙上的尋找順序，以及照片中的兩個孩子都能互相呼應。柳如煙確認，這些紀錄確實描述了同一段童年往事。她在筆記最後寫下：「約定的內容已經確認，接下來要確認的是，當年留下這些東西的人究竟是誰。」";
+                    }
+
+                    return "你們嘗試按照日期和物品出現的順序整理資料，但仍有幾個部分缺少證據。柳如煙把尚未確認的地方標記起來，提醒自己不能把推測當成答案。她決定先補齊缺少的線索，再繼續確認兩個孩子的身分。";
+                },
+                special: "teamwork",
+                flag: "organized_all_evidence"
+            },
+            {
+                text: "請柳如煙說出，她現在對你有什麼感覺",
+                affection: 3,
+                trust: 2,
+                expression: "sad",
+                response: () => {
+                    if (storyFlags.has("shared_final_dream") || storyFlags.has("connected_dream_to_letter")) {
+                        return "柳如煙沉默片刻，才緩緩說：「我不知道你是不是我一直在找的那個男孩，但我知道，這段時間你一直陪著我找答案。」她低頭看著信件，聲音很輕：「我曾經很害怕，如果有一天真的找到他，卻發現我們已經變成完全不同的人，那該怎麼辦。」她抬頭看向你：「所以我不想只因為過去的約定，就替現在的我們決定一切。我希望不管最後的答案是什麼，我們都能誠實面對。」";
+                    }
+
+                    return "柳如煙告訴你，她很珍惜你陪她尋找過去的這段時間，但她還無法確定你的夢境是否真實，也不想過早替你們的關係下定論。她希望先把當年的真相弄清楚，再認真面對接下來的事。";
+                },
+                special: "shared_present_feelings",
+                flag: "shared_present_feelings"
+            }
+        ]
+    },
+    // ==============================
+    // 第 62 幕：被遺漏的最後一頁
+    // ==============================
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "local_history_archive",
+        character: "柳如煙",
+        expression: "surprised",
+        text: "隔天，你和柳如煙再次來到文史資料室。工作人員告訴你們，原始名冊最後還有一頁當年沒有完成數位化，因此先前的資料一直缺少這部分。你們在工作人員陪同下找到那一頁，紙張邊緣雖然破損，卻保留著兩名孩子的登記資料。其中一欄寫著活動結束後的聯絡方式，另一欄則記錄了物品交還的情況。柳如煙仔細看著那頁資料，發現其中一名孩子的備註，與信件裡的約定內容完全相符；另一名孩子的備註，則寫著「已將星圖交給對方保管」。然而，姓名欄仍有一部分被污漬遮住。工作人員說，資料室還保存著當年活動的報名卡，或許能補上名冊缺失的字。柳如煙握緊筆記本，低聲說：「我們真的快找到答案了。」",
+        choices: [
+            {
+                text: "核對物品交還紀錄，確認星圖曾交給誰",
+                affection: 2,
+                trust: 3,
+                expression: "thinking",
+                response: () => {
+                    if (storyFlags.has("checked_return_date") || storyFlags.has("traced_folded_paper")) {
+                        return "你們把最新的名冊頁面與先前的物品交還紀錄並排比對，發現星圖交還的時間與信件保存紀錄相近。資料顯示，星圖是交給其中一名孩子保管，而不是留在活動中心。柳如煙回想自己家中的折紙，覺得它很可能就是當年被帶走的那份星圖，但她仍希望找到報名卡，確認當時的登記姓名。";
+                    }
+
+                    return "你們確認名冊記載了星圖交還的情況，但缺少先前的移交紀錄，還無法知道究竟由哪名孩子帶走。柳如煙將這頁資料拍照留存，決定先尋找報名卡來補足資訊。";
+                },
+                special: "verified_star_chart_transfer",
+                flag: "verified_star_chart_transfer"
+            },
+            {
+                text: "直接查找當年的原始報名卡",
+                affection: 1,
+                trust: 3,
+                expression: "normal",
+                response: () => {
+                    if (storyFlags.has("found_roster_scan") || storyFlags.has("requested_original_roster")) {
+                        return "工作人員依照原始名冊的編號，找到一疊尚未整理的報名卡。大部分卡片上的字跡已經褪色，但有兩張卡片的日期與活動紀錄一致。其中一張背面畫著一顆有著特殊長角的星星，另一張則寫著一句簡短的話：「長大以後，再一起看星星。」柳如煙看著兩張卡片，沒有立刻翻到正面，而是先請工作人員確認卡片的保存編號，避免把不同活動的資料混在一起。";
+                    }
+
+                    return "工作人員找出部分報名卡，但因為缺少完整的名冊編號，目前還不能確認哪些卡片屬於你們正在調查的活動。你們先記下可用的日期與標記，再繼續核對。";
+                },
+                special: "found_original_registration_cards",
+                flag: "found_original_registration_cards"
+            }
+        ]
+    },  
+    // ==============================
+    // 第 63 幕：逐漸清晰的名字
+    // ==============================
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "local_history_archive",
+        character: "柳如煙",
+        expression: "nervous",
+        text: "工作人員將兩張報名卡放在桌上，先確認日期、活動編號與保存紀錄。三項資料全部吻合後，你們才小心地翻到正面。第一張卡片上的姓名已經模糊，只能辨認出部分筆畫；第二張卡片的姓名則保存得比較完整，但旁邊沒有星星記號。柳如煙看著那張畫著特殊星星的卡片，忽然皺起眉頭。「這個記號……我好像看過很多次。」她從筆記本裡拿出信件的照片，再翻出折紙與鐵盒裡的紙條照片。三個記號的長角方向一致，連旁邊的小缺口也幾乎相同。你們終於能確定，這些物品與那次活動有關。但工作人員提醒你們，星星只能證明物品之間的關聯，不能單靠圖案判定是誰畫的。柳如煙點點頭，將報名卡上的姓名抄下來，卻沒有馬上告訴你。她看著你，像是在等你自己想起什麼。",
+        choices: [
+            {
+                text: "先比對報名卡、信件與折紙上的日期",
+                affection: 1,
+                trust: 3,
+                expression: "thinking",
+                response: () => {
+                    if (
+                        storyFlags.has("found_original_registration_cards") &&
+                        (storyFlags.has("recorded_event_date") || storyFlags.has("checked_return_date"))
+                    ) {
+                        return "你把報名卡日期與活動名冊、物品交還紀錄逐一比對，確認它們屬於同一場觀星活動。信件和折紙雖然沒有完整日期，但內容提到的約定地點與星圖記號，都能和這場活動的紀錄互相呼應。柳如煙輕聲說：「至少我們知道，這不是幾件剛好相似的東西，而是同一段往事留下來的證據。」";
+                    }
+
+                    return "你先把報名卡上的日期抄進筆記本，卻發現缺少一份完整的活動日期紀錄。柳如煙提醒你，現在還不能把所有資料直接連在一起。你們決定先保留這個發現，等找到足夠的日期證據再作判斷。";
+                },
+                special: "verified_registration_dates",
+                flag: "verified_registration_dates"
+            },
+            {
+                text: "請柳如煙告訴你，她認出了什麼",
+                affection: 3,
+                trust: 1,
+                expression: "sad",
+                response: () => {
+                    if (storyFlags.has("compared_personal_star") || storyFlags.has("examined_letter_star")) {
+                        return "柳如煙把三張星星圖案排在一起，指著那個特別長的角說：「我以前教過一個男孩這樣畫星星。他每次畫完，都會把其中一個角拉得很長，說這樣就算忘記了，也能認出來。」她停頓了一下。「可是我不敢只憑這個就認定是你。記得一個人的習慣，和真正知道他是誰，還是有差別的。」";
+                    }
+
+                    return "柳如煙說，這個星星記號讓她感到熟悉，卻還想不起完整的原因。她不願意因為一時的感覺就做出判斷，只是將圖案仔細收進筆記，準備與其他證據一起確認。";
+                },
+                special: "recognized_star_drawing",
+                flag: "recognized_star_drawing"
+            }
+        ]
+    },
+    // ==============================
+    // 第 64 幕：最初的約定
+    // ==============================
+    {
+        chapter: 4,
+        title: "最初的約定",
+        name: "旁白",
+        background: "old_neighborhood_park",
+        character: "柳如煙",
+        expression: "sad",
+        text: "傍晚，你和柳如煙再次來到那棵老樹下。風吹過樹葉，發出熟悉的沙沙聲。柳如煙站在長椅旁，忽然伸手摸向椅背下方，像是想確認什麼。她愣了一下，接著蹲下身，從木板的縫隙裡取出一張早已泛黃的小卡片。卡片上畫著一顆星星，其中一個角特別長。她看了很久，眼眶漸漸泛紅。「我想起來了……那天分開以前，我把這張卡片交給了他。」她抬起頭看著你。「我跟他說，就算以後忘記了彼此，只要還記得這顆星星，就一定能找到回來的路。」你看著那熟悉的圖案，心底深處彷彿有什麼即將甦醒。",
+        choices: [
+            {
+                text: "告訴她，自己也一直記得這顆星星",
+                affection: 3,
+                trust: 2,
+                clue: "past_memory",
+                expression: "surprised",
+                response: () => {
+                    storyFlags.add("shared_star_memory");
+                    return "你說出這句話的瞬間，童年的畫面忽然變得清晰。小男孩站在樹下，將一張折好的卡片交給女孩，笑著說：「下次見面的時候，我們就一起看星星吧。」柳如煙怔怔地望著你，嘴唇微微顫抖，卻沒有立刻開口。";
+                },
+                flag: "shared_star_memory"
+            },
+            {
+                text: "握住卡片，努力回想那天的情景",
+                affection: 1,
+                trust: 3,
+                expression: "thinking",
+                response: () => {
+                    storyFlags.add("recalled_promise_scene");
+                    return "你閉上眼睛，努力拼湊腦海裡的畫面。雨聲、樹影、女孩的笑聲，以及那句說過無數次的約定，終於不再只是模糊的片段。你想起那個男孩曾經答應過她，無論走多遠，都會回來一起看星空。";
+                },
+                flag: "recalled_promise_scene"
+            }
+        ]
+    },
+    // ==============================
+    // 第 65 幕：你是不是那個人
+    // ==============================
+    {
+        chapter: 4,
+        title: "你是不是那個人",
+        name: "旁白",
+        background: "old_neighborhood_park",
+        character: "柳如煙",
+        expression: "sad",
+        text: "柳如煙低頭看著手中的卡片，沉默了很久。忽然，她伸出手，輕輕敲了敲長椅，節奏和你思考時不自覺敲擊手指的習慣一模一樣。「我以前認識的那個男孩，也總是這樣。」她抬起頭，眼裡帶著期待，卻又害怕失望。「他喜歡下雨天，想事情的時候會敲手指，畫星星時還會把其中一個角畫得特別長……這些事情，你全都一樣。」她深吸一口氣。「我一直想找到他，可是我也害怕，真正找到的那一天，他已經不記得我了。」你看著她，終於明白，這些日子以來你們尋找的答案，或許一直就在彼此身邊。",
+        choices: [
+            {
+                text: "告訴她，自己也想起了那個約定",
+                affection: 3,
+                trust: 3,
+                clue: "past_memory",
+                expression: "surprised",
+                response: () => {
+                    storyFlags.add("admitted_childhood_connection");
+                    if (
+                        storyFlags.has("shared_star_memory") ||
+                        storyFlags.has("recalled_promise_scene")
+                    ) {
+                        return "你點了點頭，告訴她自己已經想起了樹下的約定。柳如煙的眼淚終於落了下來，卻露出了久違的笑容。「原來是你……我真的找到你了。」她沒有急著追問所有細節，只是將那張卡片交到你手上。「這一次，我們不要再把約定弄丟了，好不好？」";
+                    }
+                    return "你坦白自己對那段記憶仍有些模糊，但你確實想知道真相，也不想讓她再獨自尋找。柳如煙看著你，輕輕點頭。「沒關係，我們可以慢慢想起來。但這一次，我希望你能陪我走到最後。」";
+                },
+                flag: "admitted_childhood_connection"
+            },
+            {
+                text: "坦白自己還不能確定，但願意陪她找出真相",
+                affection: 1,
+                trust: 3,
+                clue: "past_memory",
+                expression: "thinking",
+                response: () => {
+                    storyFlags.add("honest_about_memory");
+                    return "你沒有急著承認一段自己尚未完全想起的往事，只是告訴她，你願意一起面對真相。柳如煙沉默片刻，最後輕輕笑了。「謝謝你沒有為了安慰我而說謊。就算最後的答案和我想的不一樣，我也想親自確認。」她收好卡片，決定不再逃避那段記憶。";
+                },
+                flag: "honest_about_memory"
+            }
+        ]
+    },
+    // ==============================
+    // 第 66 幕：那一天的真相
+    // ==============================
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "old_neighborhood_park_night",
+        character: "柳如煙",
+        expression: "sad",
+        text: "夜幕降臨，你和柳如煙坐在老樹下。她終於想起了分別那天的全部情景。當時，她的家人突然決定搬離這座城市，她甚至來不及好好道別。男孩把一封信交給她，答應等兩人長大後，一定會再回到這裡，一起看北方的第三顆星。可是那封信在搬家的途中遺失了。多年來，她只能靠著零碎的記憶尋找那個男孩，甚至漸漸忘記了他的長相。她轉頭看著你，輕聲說：「我以前一直以為，只要找到那張照片，就能找回所有記憶。現在我才明白，我真正想找回的，是那個曾經答應陪我看星星的人。」你望著夜空，童年的約定終於不再只是夢境。至於你們能否重新走在一起，答案將由此刻的你決定。",
+        choices: [
+            {
+                text: "告訴她：這次換我陪妳看完星空",
+                affection: 3,
+                trust: 2,
+                expression: "happy",
+                response: () => {
+                    storyFlags.add("promised_to_stay");
+                    if (
+                        storyFlags.has("admitted_childhood_connection") ||
+                        storyFlags.has("shared_star_memory") ||
+                        storyFlags.has("recalled_promise_scene")
+                    ) {
+                        return "柳如煙看著你，終於露出安心的笑容。「那我們說好了，這次誰都不可以先離開。」她把卡片放在你們中間，抬頭望向星空。你知道，過去的記憶或許永遠無法完整復原，但你們還有機會一起創造新的回憶。";
+                    }
+                    return "柳如煙輕輕點頭。「謝謝你願意陪我。」她沒有要求你立刻想起所有往事，只是和你一起仰望夜空。對她而言，重要的不只是過去的那個男孩，也包括此刻願意陪在她身邊的你。";
+                },
+                flag: "promised_to_stay"
+            },
+            {
+                text: "告訴她：我們不必急著替過去下定論",
+                affection: 1,
+                trust: 3,
+                expression: "thinking",
+                response: () => {
+                    storyFlags.add("chose_truth_over_assumption");
+                    return "你告訴她，過去的證據已經讓你們走到這裡，但你不想只因為幾個相似的習慣，就替彼此決定身分。柳如煙安靜地聽完，隨後點頭。「你說得對。比起急著得到答案，我更希望我們能誠實地面對彼此。」她把卡片收進口袋，兩人約好一起走完最後一段路。";
+                },
+                flag: "chose_truth_over_assumption"
+            }
+        ]
+    },
+    // ==============================
+    // 第 67 幕：最後的選擇
+    // ==============================
+    {
+        chapter: 4,
+        title: "最後的選擇",
+        name: "旁白",
+        background: "old_neighborhood_park_night",
+        character: "柳如煙",
+        expression: "thinking",
+        text: "夜空中的星星逐漸明亮。柳如煙轉過頭，認真地看著你。「以前的我，總覺得只要找到那個男孩，就能把失去的時間全部補回來。」她停了一下，露出淡淡的笑容。「可是現在，我不想再只活在回憶裡了。我想知道，站在我面前的你，究竟是怎麼想的。」她伸出手，掌心放著那張泛黃的星星卡片。「如果我們真的就是當年約定的兩個人，你願意和我一起走下去嗎？如果不是，我也希望我們能誠實地面對彼此。」你看著她，知道這次不能再用模糊的答案帶過。過去已經有了答案的輪廓，現在該決定的，是你們的未來。",
+        choices: [
+            {
+                text: "牽起她的手，約定一起創造新的回憶",
+                affection: 3,
+                trust: 2,
+                expression: "happy",
+                response: () => {
+                    storyFlags.add("chose_future_together");
+                    return "你牽起柳如煙的手，告訴她，不論過去的記憶是否完整，你都願意認真面對你們的未來。她先是一愣，隨後笑了。「那就說好了，這次我們一起走，不要再讓任何事情把我們分開。」她靠在你身旁，和你一起望向星空。";
+                },
+                flag: "chose_future_together"
+            },
+            {
+                text: "告訴她，先給彼此時間，不急著決定關係",
+                affection: 1,
+                trust: 3,
+                expression: "thinking",
+                response: () => {
+                    storyFlags.add("chose_slowly_together");
+                    return "你坦白地告訴她，你很珍惜這段相遇，但希望兩人能在理解彼此之後，再決定未來。柳如煙安靜地聽著，最後點了點頭。「好啊。這一次，我們不必急著追上過去，就一步一步地往前走。」她把星星卡片交給你保管，兩人肩並肩地離開了老樹。";
+                },
+                flag: "chose_slowly_together"
+            },
+            {
+                text: "坦白自己還無法確認過去，但願意珍惜現在",
+                affection: 1,
+                trust: 3,
+                expression: "sad",
+                response: () => {
+                    storyFlags.add("chose_uncertain_truth");
+                    return "你沒有假裝自己已經想起一切，而是把心裡的不確定全都告訴她。柳如煙沉默了片刻，眼中閃過一絲失落，卻還是點頭。「謝謝你願意說實話。至少現在，我們不用再猜測彼此的心意。」她收起卡片，與你一起走向回家的路。";
+                },
+                flag: "chose_uncertain_truth"
+            }
+        ]
+    },
+    // ==============================
+    // 第 68 幕：心動的每一天
+    // ==============================
+    {
+        chapter: 4,
+        title: "心動的每一天",
+        name: "旁白",
+        background: "starry_sky_ending",
+        character: "柳如煙",
+        expression: "happy",
+
+        text: `柳如煙望著星空，輕聲說：
+    「你還記得我們小時候的約定嗎？」
+
+    她轉頭看向你，紅著臉說：
+    「其實，我喜歡你。那麼……你願意陪我走下去嗎？」`,
+
+        choices: [
+            {
+                text: "牽起她的手，告訴她自己也喜歡她",
+                affection: 3,
+                trust: 3,
+                special: "teamwork",
+                expression: "love",
+                response: function () {
+                    return `你握住她的手。
+    「我願意，因為我也喜歡妳。」
+
+    柳如煙露出幸福的笑容。
+    「那我們說好了，以後還要一起看星星喔。」`;
+                }
+            },
+            {
+                text: "抱住她，告訴她想和她慢慢走下去",
+                affection: 1,
+                trust: 3,
+                expression: "happy",
+                response: function () {
+                    return `你輕輕抱住她。
+    「我想和妳一起，慢慢創造更多回憶。」
+
+    柳如煙輕輕點頭。
+    「嗯，那我們就慢慢走下去。」`;
+                }
+            },
+            {
+                text: "坦白自己還需要時間整理心情",
+                affection: 0,
+                trust: 3,
+                expression: "normal",
+                response: function () {
+                    return `你坦白說出自己的猶豫。
+    「我很珍惜妳，但我還需要一點時間。」
+
+    柳如煙有些失落，仍輕聲回答：
+    「我明白了，謝謝你願意對我說實話。」`;
+                }
+            }
+        ]
+    }
+];
+const totalScenes = storyScenes.length;
 // ========================================
 // 3. 關係與結局判定
 // ========================================
@@ -2675,10 +3397,32 @@ function getRelationship() {
 }
 
 function getEnding() {
-    if (hiddenEndingUnlocked) return "隱藏結局";
-    if (affection >= 90) return "好結局";
-    if (affection >= 55) return "普通結局";
-    return "失敗結局";
+    // 隱藏結局優先
+    if (hiddenEndingUnlocked) {
+        return "隱藏結局";
+    }
+
+    // 是否做過重要的感情選擇
+    const madeKeyChoices =
+        specialChoices.has("recalled_letter_emotion") &&
+        specialChoices.has("shared_present_feelings");
+
+    // 好結局：好感、信任與關鍵選擇都達標
+    if (
+        affection >= 80 &&
+        trust >= 60 &&
+        madeKeyChoices
+    ) {
+        return "好結局";
+    }
+
+    // 失敗結局：感情或信任不足
+    if (affection < 40 || trust < 30) {
+        return "失敗結局";
+    }
+
+    // 其餘情況
+    return "普通結局";
 }
 
 // ========================================
