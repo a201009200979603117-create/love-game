@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <meta name="theme-color" content="#151525">
+    <title>心動的每一天</title>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <!-- ==============================
+         主選單
+    ============================== -->
+    <div id="menu">
+        
+        
+        <div class="floating-hearts" aria-hidden="true">
+            <span>♡</span>
+            <span>♥</span>
+            <span>♡</span>
+            <span>♥</span>
+            <span>♡</span>
+            <span>♥</span>
+            <span>♡</span>
+            <span>♥</span>
+            <span>♡</span>
+            <span>♥</span>
+            <span>♡</span>
+            <span>♥</span>
+        </div>
+                
+        <div class="floating-sparkles" aria-hidden="true">
+            <span>✦</span>
+            <span>✧</span>
+            <span>✦</span>
+            <span>✧</span>
+            <span>✦</span>
+            <span>✧</span>
+            <span>✦</span>
+            <span>✧</span>
+        </div>
+
+
+        <div class="menu-overlay">
+            <p class="menu-subtitle">MY YOUTH, MY STORY</p>
+
+            <h1 class="menu-title">心動的每一天</h1>
+
+            <p class="menu-description">
+                有些相遇，會讓平凡的日子變得特別。
+                <br>
+                你的青春故事，從這裡開始。
+            </p>
+
+            <button id="start-button" onclick="startGame()">
+                開始故事　→
+            </button>
+        </div>
+    </div>
+
+
+    <!-- ==============================
+         遊戲主畫面
+    ============================== -->
+    <main id="game" style="display: none;">
+
+        <!-- 左上角操作按鈕 -->
+        <div id="game-toolbar">
+            <button
+                id="restart-button"
+                onclick="restartGame()"
+            >
+                重開
+            </button>
+            
+            <button
+                id="save-button"
+                onclick="saveGame()"
+            >
+                💾 存檔
+            </button>
+
+            <button
+                id="load-button"
+                onclick="loadGame()"
+            >
+                📂 讀檔
+            </button>
+            <button
+                id="puzzle-button"
+                onclick="openPuzzleModal()"
+            >
+                🔍 解謎
+            </button>
+
+            <button
+                id="settings-button"
+                onclick="toggleSettings(true)"
+                aria-label="開啟遊戲設定"
+            >
+                ⚙ 設定
+            </button>
+
+            <!-- 存檔狀態（由 script.js 的 updateSaveStatus 更新） -->
+            <span id="save-status" aria-live="polite"></span>
+        </div>
+
+
+        <!-- 遊戲背景 -->
+        <div id="scene-background"></div>
+        <div id="scene-overlay"></div>
+
+        <!-- 女主角 -->
+        <div id="character-area">
+            <img
+                id="character-image"
+                src="images/heroine.png"
+                alt="柳如煙"
+            >
+        </div>
+
+
+        <!-- 劇情對話 -->
+        <section id="dialogue-box">
+            <h3 id="character-name">旁白</h3>
+
+            <p id="dialogue">你走進教室，發現一位陌生的女孩坐在窗邊。</p>
+
+            <div id="scene-progress">第 1 / 236 段</div>
+
+            <!-- 給螢幕閱讀器的朗讀區：整段文字顯示完才更新，避免逐字朗讀 -->
+            <div id="sr-live" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+        </section>
+
+
+        <!-- 好感度系統 -->
+        <section id="affection-panel">
+            <p id="affection">好感度：0 / 100</p>
+
+            <p id="affection-level">關係：陌生人</p>
+
+            <div id="affection-bar">
+                <div id="affection-fill"></div>
+            </div>
+        </section>
+
+
+        <!-- 劇情選項由 script.js 自動建立 -->
+        <div id="story-choices" style="display: none;"></div>
+
+
+
+        <!-- ==============================
+             遊戲設定視窗
+        ============================== -->
+        <div
+            id="settings-overlay"
+            style="display: none;"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="settings-title"
+        >
+            <section id="settings-panel">
+
+                <div id="settings-header">
+                    <div>
+                        <p class="settings-subtitle">
+                            GAME PREFERENCES
+                        </p>
+
+                        <h2 id="settings-title">
+                            遊戲設定
+                        </h2>
+                    </div>
+
+                    <button
+                        id="settings-close"
+                        onclick="toggleSettings(false)"
+                        aria-label="關閉設定"
+                    >
+                        ✕
+                    </button>
+                </div>
+
+
+                <!-- 文字速度 -->
+                <div class="setting-item">
+                    <div class="setting-label-row">
+                        <label for="text-speed">
+                            文字顯示速度
+                        </label>
+
+                        <span id="text-speed-value">
+                            普通
+                        </span>
+                    </div>
+
+                    <input
+                        type="range"
+                        id="text-speed"
+                        min="1"
+                        max="5"
+                        value="3"
+                        step="1"
+                    >
+
+                    <p class="setting-description">
+                        調整劇情文字出現的速度。
+                    </p>
+                </div>
+
+
+                <!-- 背景音樂音量 -->
+                <div class="setting-item">
+                    <div class="setting-label-row">
+                        <label for="music-volume">
+                            背景音樂
+                        </label>
+
+                        <span id="music-volume-value">
+                            50%
+                        </span>
+                    </div>
+
+                    <input
+                        type="range"
+                        id="music-volume"
+                        min="0"
+                        max="100"
+                        value="50"
+                        step="5"
+                    >
+
+                    <p class="setting-description">
+                        調整背景音樂音量。
+                    </p>
+                </div>
+
+
+                <!-- 音效音量 -->
+                <div class="setting-item">
+                    <div class="setting-label-row">
+                        <label for="sfx-volume">
+                            遊戲音效
+                        </label>
+
+                        <span id="sfx-volume-value">
+                            70%
+                        </span>
+                    </div>
+
+                    <input
+                        type="range"
+                        id="sfx-volume"
+                        min="0"
+                        max="100"
+                        value="70"
+                        step="5"
+                    >
+
+                    <p class="setting-description">
+                        調整按鈕與劇情音效音量。
+                    </p>
+                </div>
+
+
+                <!-- 逐字顯示 -->
+                <div class="setting-item setting-toggle-row">
+                    <div>
+                        <label for="typewriter-toggle">
+                            逐字顯示
+                        </label>
+
+                        <p class="setting-description">
+                            關閉後直接顯示完整對話。
+                        </p>
+                    </div>
+
+                    <input
+                        type="checkbox"
+                        id="typewriter-toggle"
+                        checked
+                    >
+                </div>
+
+
+                <!-- 全螢幕 -->
+                <button
+                    id="fullscreen-button"
+                    onclick="toggleFullscreen()"
+                >
+                    ⛶ 切換全螢幕
+                </button>
+
+
+                <!-- 關閉設定 -->
+                <button
+                    id="settings-done"
+                    onclick="toggleSettings(false)"
+                >
+                    完成設定
+                </button>
+
+            </section>
+        </div>
+
+
+        <!-- ==============================
+             結局 CG
+        ============================== -->
+        <div
+            id="ending-cg"
+            style="display: none;"
+            onclick="advanceEndingCG()"
+        >
+            <img
+                id="ending-cg-image"
+                src=""
+                alt="結局專屬插畫"
+            >
+
+            <div id="ending-dialogue-box">
+                <h3 id="ending-cg-title">故事結局</h3>
+
+                <p id="ending-cg-dialogue">
+                    點擊畫面，揭開故事結局……
+                </p>
+
+                <span id="ending-cg-hint">
+                    點擊畫面繼續 ▶
+                </span>
+            </div>
+        </div>
+
+    </main>
+    
+    <!-- 遊戲內提示（取代 alert） -->
+    <div id="game-toast" role="status" aria-live="polite"></div>
+
+    <!-- 遊戲內確認視窗（取代瀏覽器的 confirm） -->
+    <div
+        id="confirm-overlay"
+        style="display: none;"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="confirm-message"
+    >
+        <div id="confirm-panel">
+            <p id="confirm-message"></p>
+
+            <div id="confirm-actions">
+                <button type="button" id="confirm-cancel"
+                        onclick="closeConfirmDialog(false)">
+                    取消
+                </button>
+
+                <button type="button" id="confirm-ok"
+                        onclick="closeConfirmDialog(true)">
+                    確定覆蓋
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 解謎彈窗 -->
+    <div
+        id="puzzle-modal"
+        class="puzzle-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="解謎筆記"
+    >
+        <div class="puzzle-window">
+
+            <div class="puzzle-header">
+                <h2>✦ 解謎筆記 ✦</h2>
+                <button class="puzzle-close"
+                        onclick="closePuzzleModal()">✕</button>
+            </div>
+
+            <div class="puzzle-tabs">
+                <button class="puzzle-tab active"
+                        onclick="showPuzzleTab('clues')">
+                    📖 線索筆記
+                </button>
+
+                <button class="puzzle-tab"
+                        onclick="showPuzzleTab('puzzles')">
+                    🔍 解開謎題
+                </button>
+            </div>
+
+            <div id="puzzle-clues" class="puzzle-content">
+                <p class="puzzle-description">
+                    你所收集的線索，都記錄在這裡。
+                </p>
+                <div id="puzzle-clue-list"></div>
+            </div>
+
+            <div id="puzzle-list" class="puzzle-content"
+                style="display:none;">
+                <p class="puzzle-description">
+                    仔細思考線索，找出被隱藏的真相。
+                </p>
+
+                <button class="puzzle-entry"
+                        onclick="solvePhotoPuzzle()">
+                    <span>📷 舊照片之謎</span>
+                    <span id="photo-puzzle-status">尚未解開</span>
+                </button>
+
+                <button class="puzzle-entry"
+                        onclick="solveLetterPuzzle()">
+                    <span>✉️ 神祕信件之謎</span>
+                    <span id="letter-puzzle-status">尚未解開</span>
+                </button>
+                
+                <div id="puzzle-answer-area" style="display:none;">
+                    <h3 id="puzzle-question-title">🔍 解開謎題</h3>
+
+                    <p id="puzzle-question-text">
+                        仔細思考你找到的線索。
+                    </p>
+
+                    <input
+                        type="text"
+                        id="puzzle-answer-input"
+                        placeholder="輸入你的答案"
+                        autocomplete="off"
+                    >
+
+                    <div class="puzzle-answer-actions">
+                        <button type="button" onclick="submitPuzzleAnswer()">
+                            確認答案
+                        </button>
+
+                        <button type="button" onclick="cancelPuzzleAnswer()">
+                            返回
+                        </button>
+                    </div>
+
+                    <p id="puzzle-feedback" aria-live="polite"></p>
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+
+
+
+    <!-- JavaScript -->
+    <script src="script.js"></script>
+
+</body>
+</html>
