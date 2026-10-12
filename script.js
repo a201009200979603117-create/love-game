@@ -1,20 +1,68 @@
-
 "use strict";
 // 背景音樂
 const bgm = new Audio("audio/bgm.mp3");
 bgm.loop = true;
-// 按鈕點擊音效
+bgm.preload = "auto";
+
+// 按鈕點擊音效：預先載入一次，之後用 cloneNode 重複播放，避免每次都重新建立 Audio
+const clickSoundBase = new Audio("audio/click.mp3");
+clickSoundBase.preload = "auto";
+
 function playClickSound() {
-    const sound = new Audio("audio/click.mp3");
+    const sound = clickSoundBase.cloneNode();
     sound.volume = gameSettings.sfxVolume / 100;
-    sound.play().catch(error => {
-        console.warn("按鈕音效播放失敗：", error);
+    sound.play().catch(() => {
+        // 音效檔不存在或瀏覽器尚未允許播放時，靜默略過
     });
 }
 
 // 套用背景音樂音量
 function updateBgmVolume() {
     bgm.volume = gameSettings.musicVolume / 100;
+}
+
+// 手機瀏覽器可能擋下自動播放：遊戲進行中，第一次觸控／點擊時再嘗試啟動音樂
+let gameStarted = false;
+
+document.addEventListener("pointerdown", () => {
+    if (gameStarted && bgm.paused) {
+        bgm.play().catch(() => {});
+    }
+});
+
+// ========================================
+// 遊戲內提示（取代 alert，不會打斷打字動畫）
+// ========================================
+
+let toastTimer = null;
+
+function showToast(message, duration = 3200) {
+    const toast = document.getElementById("game-toast");
+
+    if (!toast) {
+        console.info(message);
+        return;
+    }
+
+    toast.textContent = message;
+    toast.classList.add("show");
+
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
+        toast.classList.remove("show");
+        toastTimer = null;
+    }, duration);
+}
+
+function hideToast() {
+    const toast = document.getElementById("game-toast");
+
+    clearTimeout(toastTimer);
+    toastTimer = null;
+
+    if (toast) {
+        toast.classList.remove("show");
+    }
 }
 
 // ========================================
@@ -46,20 +94,15 @@ function updateRelationshipStage() {
     }
 }
 
-function getTrustText(lowTrustText, highTrustText, requiredTrust = 30) {
-    if (trust >= requiredTrust) {
-        return highTrustText;
-    }
-
-    return lowTrustText;
-}
-
 // 根據玩家過去的選擇，取得不同的劇情文字
+// variations 內的 key 順序就是優先順序（寫在前面的優先），
+// 不再受玩家選擇的先後順序影響。
 function getStoryText(normalText, variations = {}) {
-    // 優先顯示專屬選擇的劇情
-    for (const flag of storyFlags) {
-        if (variations[flag]) {
-            return variations[flag];
+    for (const key of Object.keys(variations)) {
+        if (key === "distant" || key === "close") continue;
+
+        if (storyFlags.has(key)) {
+            return variations[key];
         }
     }
 
@@ -90,11 +133,11 @@ let solvedPuzzles = new Set();
 const clueData = {
     old_photo: {
         name: "舊照片",
-        description: "照片裡有兩個孩子，背面寫著一個未完成的約定。"
+        description: "照片裡有兩個孩子，背面寫著一個未完成的約定。日期雖然模糊，仍能辨認出年份是 2015 年，月日已經看不清楚。"
     },
     mysterious_letter: {
         name: "神祕信件",
-        description: "一封沒有寄出的信，可能藏著約定的真正原因。"
+        description: "一封沒有寄出的信，可能藏著約定的真正原因。信末寫著：「真正重要的，不是你記得多少，而是你是否願意再次尋找。」"
     },
     past_memory: {
         name: "遺失的回憶",
@@ -114,27 +157,38 @@ function collectClue(clueId) {
 
     discoveredClues.add(clueId);
 
-    alert(
-        "發現新線索！\n\n" +
-        clueData[clueId].name +
-        "\n" +
-        clueData[clueId].description
+    showToast(
+        "✦ 發現新線索：" + clueData[clueId].name +
+        "（可在「🔍 解謎」查看）"
     );
 }
 
 let currentPuzzle = null;
 
+// 統一答案格式：去除空白、全形轉半形、轉小寫
+function normalizeAnswer(text) {
+    return String(text)
+        .replace(/[！-～]/g, ch =>
+            String.fromCharCode(ch.charCodeAt(0) - 0xFEE0)
+        )
+        .replace(/　/g, " ")
+        .replace(/\s+/g, "")
+        .toLowerCase();
+}
+
 // 開始解謎：改用遊戲內的輸入區
+// correctAnswer 可以是字串，也可以是多個可接受答案的陣列
 function solvePuzzle(puzzleId, question, correctAnswer) {
     if (solvedPuzzles.has(puzzleId)) {
-        alert("你已經解開這道謎題了！");
+        showToast("你已經解開這道謎題了！");
         updatePuzzleStatus();
         return;
     }
 
     currentPuzzle = {
         id: puzzleId,
-        answer: correctAnswer
+        answers: (Array.isArray(correctAnswer) ? correctAnswer : [correctAnswer])
+            .map(normalizeAnswer)
     };
 
     const title = document.getElementById("puzzle-question-title");
@@ -144,7 +198,7 @@ function solvePuzzle(puzzleId, question, correctAnswer) {
     const feedback = document.getElementById("puzzle-feedback");
 
     if (!title || !questionText || !answerInput || !answerArea || !feedback) {
-        alert("找不到解謎輸入區，請確認 index.html 已加入答案輸入區。");
+        showToast("找不到解謎輸入區，請確認 index.html 已加入答案輸入區。");
         return;
     }
 
@@ -165,7 +219,7 @@ function submitPuzzleAnswer() {
     const answerInput = document.getElementById("puzzle-answer-input");
     const feedback = document.getElementById("puzzle-feedback");
 
-    const answer = answerInput.value.trim();
+    const answer = normalizeAnswer(answerInput.value);
 
     if (!answer) {
         feedback.textContent = "請先輸入答案。";
@@ -173,7 +227,7 @@ function submitPuzzleAnswer() {
         return;
     }
 
-    if (answer === currentPuzzle.answer) {
+    if (currentPuzzle.answers.includes(answer)) {
         solvedPuzzles.add(currentPuzzle.id);
 
         feedback.textContent = "✦ 解謎成功！你離真相又近了一步。";
@@ -202,13 +256,13 @@ function cancelPuzzleAnswer() {
 function solvePhotoPuzzle() {
     // 必須先取得舊照片線索
     if (!discoveredClues.has("old_photo")) {
-        alert("你還沒有找到舊照片，無法解開這道謎題。");
+        showToast("你還沒有找到舊照片，無法解開這道謎題。");
         return;
     }
 
     solvePuzzle(
         "photo_date",
-        "【舊照片之謎】\n\n照片背面的約定日期已經模糊不清。\n\n請輸入你推測的年份（西元四位數）：",
+        "【舊照片之謎】\n\n照片背面的約定日期已經模糊不清。請翻閱「線索筆記」裡的舊照片，推測約定的年份。\n\n請輸入年份（西元四位數）：",
         "2015"
     );
 }
@@ -216,40 +270,15 @@ function solvePhotoPuzzle() {
 function solveLetterPuzzle() {
     // 必須先找到神祕信件
     if (!discoveredClues.has("mysterious_letter")) {
-        alert("你還沒有找到神祕信件，無法解開這道謎題。");
+        showToast("你還沒有找到神祕信件，無法解開這道謎題。");
         return;
     }
 
     solvePuzzle(
         "letter_secret",
-        "【神祕信件之謎】\n\n信件裡留下了一句話：\n「真正重要的，不是你記得多少，而是你是否願意再次尋找。」\n\n請輸入這句話的核心答案：",
-        "尋找"
+        "【神祕信件之謎】\n\n信件裡留下了一句話：\n「真正重要的，不是你記得多少，而是你是否願意再次尋找。」\n\n請輸入這句話的核心答案（兩個字）：",
+        ["尋找", "再次尋找"]
     );
-}
-
-
-// 顯示線索筆記本
-function showClueNotebook() {
-    const clues = Array.from(discoveredClues);
-
-    if (clues.length === 0) {
-        alert("目前還沒有找到任何線索。");
-        return;
-    }
-
-    let message = "📖 線索筆記本\n\n";
-
-    clues.forEach((clueId, index) => {
-        const clue = clueData[clueId];
-
-        if (clue) {
-            message +=
-                `${index + 1}. ${clue.name}\n` +
-                `${clue.description}\n\n`;
-        }
-    });
-
-    alert(message);
 }
 
 /* ==============================
@@ -262,6 +291,7 @@ function openPuzzleModal() {
 
     if (!modal) return;
 
+    cancelPuzzleAnswer();
     modal.style.display = "flex";
     showPuzzleTab("clues");
 }
@@ -358,6 +388,8 @@ function updatePuzzleStatus() {
 }
 
 let typingTimer = null;
+let afterTyping = null;      // 文字顯示完畢後要執行的動作（例如顯示選項）
+let backgroundTimer = null;  // 背景切換用的計時器
 let currentText = "";
 let endingCgStep = 0;
 let currentEndingText = "";
@@ -391,20 +423,138 @@ const textSpeedLabels = {
 };
 
 const MAX_AFFECTION = 100;
+const MAX_TRUST = 100;
+
+// 劇情資料裡每個選項的數值加總偏高（好感最多 158、信任最少 113），
+// 很容易全滿，結局失去區分度，所以統一依比例縮放。
+const AFFECTION_SCALE = 0.6;
+const TRUST_SCALE = 0.5;
+
+// 結局門檻（依縮放後的數值，經過模擬：多數選擇偏向友善的玩家會拿到好結局，
+// 選擇混合的玩家是普通結局，多數選擇偏向冷淡的玩家才會是失敗結局）
+const ENDING_RULES = {
+    goodAffection: 72,
+    goodTrust: 78,
+    badAffection: 55,
+    badTrust: 66
+};
 
 // ========================================
 // 2. 劇情資料
 // ========================================
 
+// ========================================
+// 場景背景宣告
+// ========================================
+// 劇情裡用到的「每一個」背景都先宣告在這裡：名稱 → 圖片路徑。
+// 之後只要把圖片放進 images 資料夾（檔名與下方相同），遊戲就會自動改用它，
+// 不需要再改任何程式。
+//
+//   名稱                          圖片檔                                 用在哪裡
 const sceneBackgrounds = {
-    classroom: "images/classroom.png",
-    hallway: "images/hallway.png",
-    school: "images/school.png",
-    library: "images/library.png",
-    rainy_school: "images/rainy_school.png",
-    event_classroom: "images/event_classroom.png",
-    playground: "images/playground.png",
+    classroom:                   "images/classroom.png",                  // 教室（白天）
+    classroom_sunset:            "images/classroom_sunset.png",           // 教室（放學後夕陽）
+    hallway:                     "images/hallway.png",                    // 走廊、樓梯口
+    school:                      "images/school.png",                     // 校園一般場景
+    school_store:                "images/school_store.png",               // 福利社
+    library:                     "images/library.png",                    // 圖書館（白天）
+    school_library_evening:      "images/school_library_evening.png",     // 圖書館（傍晚整理資料）
+    rainy_school:                "images/rainy_school.png",               // 雨天的校園
+    playground:                  "images/playground.png",                 // 操場、老樹
+    event_classroom:             "images/event_classroom.png",            // 活動教室
+    bedroom:                     "images/bedroom.png",                    // 主角的房間（夜晚）
+    dream_campus:                "images/dream_campus.png",               // 夢境中的校園與老樹
+    ruyan_childhood_room:        "images/ruyan_childhood_room.png",       // 柳如煙家裡
+    old_community_center:        "images/old_community_center.png",       // 老社區活動中心外觀
+    old_center_room:             "images/old_center_room.png",            // 活動中心走廊／房間
+    old_center_storage:          "images/old_center_storage.png",         // 活動中心儲藏室
+    old_center_window_rain:      "images/old_center_window_rain.png",     // 儲藏室窗外下雨
+    old_center_office:           "images/old_center_office.png",          // 活動中心辦公室
+    old_center_archive:          "images/old_center_archive.png",         // 活動中心資料室
+    local_history_archive:       "images/local_history_archive.png",      // 地方文史資料室
+    riverside_evening:           "images/riverside_evening.png",          // 傍晚的河堤
+    old_observatory_platform:    "images/old_observatory_platform.png",   // 舊觀景台
+    old_neighborhood_park:       "images/old_neighborhood_park.png",      // 老公園與老樹
+    old_neighborhood_park_night: "images/old_neighborhood_park_night.png",// 老公園（夜晚）
+    childhood_memory_rain:       "images/childhood_memory_rain.png",      // 童年回憶（雨中老樹）
+    starry_sky_ending:           "images/starry_sky_ending.png"           // 結尾星空
 };
+
+// 還沒有圖片時，先借用相近的背景（找不到檔案才會用到）。
+// 新增圖片之後不用改這裡，遊戲會優先使用自己的圖片。
+const backgroundFallbacks = {
+    classroom_sunset: "classroom",
+    school_store: "hallway",
+    school_library_evening: "library",
+    event_classroom: "classroom",
+    bedroom: "classroom",
+    dream_campus: "playground",
+    ruyan_childhood_room: "classroom",
+    old_community_center: "school",
+    old_center_room: "school",
+    old_center_storage: "library",
+    old_center_window_rain: "rainy_school",
+    old_center_office: "old_center_room",
+    old_center_archive: "library",
+    local_history_archive: "library",
+    riverside_evening: "playground",
+    old_observatory_platform: "playground",
+    old_neighborhood_park: "playground",
+    old_neighborhood_park_night: "old_neighborhood_park",
+    childhood_memory_rain: "rainy_school",
+    starry_sky_ending: "old_neighborhood_park_night",
+    hallway: "school",
+    school: "classroom",
+    library: "classroom",
+    rainy_school: "school",
+    playground: "school"
+};
+
+// 所有背景都找不到時使用的最後備援圖片
+const DEFAULT_BACKGROUND = "images/Main_Screen.png";
+
+// 預先檢查哪些圖片真的存在：名稱 → true（有圖）／false（沒有圖）
+const backgroundAvailability = {};
+
+function preloadBackgrounds() {
+    Object.keys(sceneBackgrounds).forEach(name => {
+        const img = new Image();
+
+        img.onload = () => {
+            backgroundAvailability[name] = true;
+            refreshBackgroundIfCurrent(name);
+        };
+
+        img.onerror = () => {
+            backgroundAvailability[name] = false;
+        };
+
+        img.src = sceneBackgrounds[name];
+    });
+
+    const fallbackImg = new Image();
+    fallbackImg.src = DEFAULT_BACKGROUND;
+}
+
+// 找出實際要顯示的圖片：自己的圖片 → 替代背景 → 最後備援
+function getBackgroundPath(name) {
+    const visited = new Set();
+    let current = name;
+
+    while (current && !visited.has(current)) {
+        visited.add(current);
+
+        if (sceneBackgrounds[current] && backgroundAvailability[current] === true) {
+            return sceneBackgrounds[current];
+        }
+
+        current = backgroundFallbacks[current];
+    }
+
+    return DEFAULT_BACKGROUND;
+}
+
+preloadBackgrounds();
 
 const storyScenes = [
     // ==============================
@@ -412,10 +562,18 @@ const storyScenes = [
     // ==============================
 
     // 第 1 段：初次相遇
+    // 第 1 段（1/2 幕）
     {
         name: "旁白",
         background: "classroom",
-        text: "九月的早晨，陽光穿過教室的窗戶。班導帶著一名陌生的少女走進教室。班導說它叫做柳如煙，她有著安靜的氣質，手裡抱著幾本課本。當她看向你時，腳步似乎停頓了一瞬，但很快又恢復平靜。",
+        text: "九月的早晨，陽光穿過教室的窗戶。班導帶著一名陌生的少女走進教室。班導說她叫做柳如煙，她有著安靜的氣質，手裡抱著幾本課本。",
+        choices: []
+    },
+    // 第 1 段（2/2 幕）
+    {
+        name: "旁白",
+        background: "classroom",
+        text: "當她看向你時，腳步似乎停頓了一瞬，但很快又恢復平靜。",
         choices: [
             {
                 text: "主動自我介紹，歡迎她加入班級",
@@ -510,7 +668,7 @@ const storyScenes = [
     // 第 4 段：不熟悉的旋律
     {
         name: "旁白",
-        background: "school",
+        background: "hallway",
         text: "下課後，你在走廊遇見柳如煙。她戴著耳機，輕輕哼著一段旋律。那旋律很簡單，聽起來有些懷舊。當她發現你站在旁邊，便停了下來。",
         choices: [
             {
@@ -542,7 +700,7 @@ const storyScenes = [
     // 第 5 段：福利社的選擇
     {
         name: "柳如煙",
-        background: "school",
+        background: "school_store",
         text: "午休時，你和柳如煙一起走到福利社。她在飲料櫃前看了一會兒，最後拿起一瓶包裝簡單的汽水。「這個味道還不錯。」她說。",
         choices: [
             {
@@ -759,10 +917,18 @@ const storyScenes = [
         ]
     },
     // 第 11 段：奇怪的夢
+    // 第 11 段（1/2 幕）
     {
         name: "旁白",
-        background: "classroom",
-        text: "那天晚上，你做了一個奇怪的夢。夢裡是一座有大樹的校園，你似乎正和某個人說話。但夢裡的聲音模糊不清，醒來後，你只記得那是一個讓人安心的地方。",
+        background: "bedroom",
+        text: "那天晚上，你做了一個奇怪的夢。",
+        choices: []
+    },
+    // 第 11 段（2/2 幕）
+    {
+        name: "旁白",
+        background: "dream_campus",
+        text: "夢裡是一座有大樹的校園，你似乎正和某個人說話。但夢裡的聲音模糊不清，醒來後，你只記得那是一個讓人安心的地方。",
         choices: [
             {
                 text: "把夢裡的感覺和細節記在手機備忘錄",
@@ -872,7 +1038,7 @@ const storyScenes = [
     // 第 14 段：臨時的邀請
     {
         name: "柳如煙",
-        background: "playground",
+        background: "classroom_sunset",
         text: "放學後，柳如煙收拾好書包，走到你面前。「我想去附近的書店看看，你要一起去嗎？」她說完後，似乎有些在意你的回答。",
         choices: [
             {
@@ -908,10 +1074,25 @@ const storyScenes = [
         ]
     },
     // 第 15 段：奇怪的巧合
+    // 第 15 段（1/3 幕）
     {
         name: "旁白",
         background: "classroom",
-        text: "幾天後，你在整理課桌時，翻出一本很久以前用過的舊筆記本。裡面有幾頁字跡已經褪色，還畫著一些看不出意思的小圖案。其中一頁畫著一顆星星，旁邊還寫著一串模糊的數字。你盯著它看了幾秒，腦海裡忽然閃過一個模糊的畫面：好像曾經有人和你約定，要在某個夜晚一起看星星。可是，那個人的臉怎麼也看不清楚。這時，柳如煙剛好走進教室。",
+        text: "幾天後，你在整理課桌時，翻出一本很久以前用過的舊筆記本。裡面有幾頁字跡已經褪色，還畫著一些看不出意思的小圖案。",
+        choices: []
+    },
+    // 第 15 段（2/3 幕）
+    {
+        name: "旁白",
+        background: "classroom",
+        text: "其中一頁畫著一顆星星，旁邊還寫著一串模糊的數字。",
+        choices: []
+    },
+    // 第 15 段（3/3 幕）
+    {
+        name: "旁白",
+        background: "classroom",
+        text: "你盯著它看了幾秒，腦海裡忽然閃過一個模糊的畫面：好像曾經有人和你約定，要在某個夜晚一起看星星。可是，那個人的臉怎麼也看不清楚。這時，柳如煙剛好走進教室。",
         choices: [
             {
                 text: "把筆記本拿給柳如煙看，問她認不認得這顆星星",
@@ -949,6 +1130,7 @@ const storyScenes = [
     // ==============================
 
     // 第 16 段：整理教室
+    // 第 16 段（1/3 幕）
     {
         chapter: 2,
         title: "照片裡的陌生人",
@@ -956,7 +1138,29 @@ const storyScenes = [
         background: "classroom",
         character: "柳如煙",
         expression: "normal",
-        text: "學校準備整理一批舊教材，老師請幾位同學留下來幫忙。你和柳如煙負責整理教室後方的櫃子。翻找資料時，你們看到幾本年代久遠的校刊。柳如煙拿起其中一本，翻到一頁有著星空活動照片的地方，指尖停了片刻，隨後又把校刊闔上。你注意到，那一瞬間她的神情不像是在看陌生的資料，反而像是看見了某段不願輕易提起的回憶。",
+        text: "學校準備整理一批舊教材，老師請幾位同學留下來幫忙。你和柳如煙負責整理教室後方的櫃子。翻找資料時，你們看到幾本年代久遠的校刊。",
+        choices: []
+    },
+    // 第 16 段（2/3 幕）
+    {
+        chapter: 2,
+        title: "照片裡的陌生人",
+        name: "旁白",
+        background: "classroom",
+        character: "柳如煙",
+        expression: "normal",
+        text: "柳如煙拿起其中一本，翻到一頁有著星空活動照片的地方，指尖停了片刻，隨後又把校刊闔上。",
+        choices: []
+    },
+    // 第 16 段（3/3 幕）
+    {
+        chapter: 2,
+        title: "照片裡的陌生人",
+        name: "旁白",
+        background: "classroom",
+        character: "柳如煙",
+        expression: "normal",
+        text: "你注意到，那一瞬間她的神情不像是在看陌生的資料，反而像是看見了某段不願輕易提起的回憶。",
         choices: [
             {
                 text: "問她以前的校園生活是不是很有趣",
@@ -994,7 +1198,7 @@ const storyScenes = [
         chapter: 2,
         title: "照片裡的陌生人",
         name: "旁白",
-        background: "school",
+        background: "classroom_sunset",
         character: "柳如煙",
         expression: "normal",
         text: "放學後，教室裡的人逐漸散去。柳如煙還坐在位置上整理課本，窗外的夕陽落在她的筆記本上。你收拾好書包，正準備離開，她忽然抬起頭，像是有話想說，最後卻只是看著你。",
@@ -1050,6 +1254,7 @@ const storyScenes = [
     // ==============================
     // 第 18 幕
     // ==============================
+    // 第 18 段（1/2 幕）
     {
         chapter: 2,
         title: "照片裡的陌生人",
@@ -1057,7 +1262,18 @@ const storyScenes = [
         background: "classroom",
         character: "柳如煙",
         expression: "normal",
-        text: "隔天早上，教室裡比平常熱鬧。有人正在討論週末的安排，柳如煙則安靜地翻閱一本校園刊物。當你經過她的座位時，她抬頭看了你一眼，隨即把刊物稍微合起來，像是不確定該不該讓你看見裡面的內容。",
+        text: "隔天早上，教室裡比平常熱鬧。有人正在討論週末的安排，柳如煙則安靜地翻閱一本校園刊物。",
+        choices: []
+    },
+    // 第 18 段（2/2 幕）
+    {
+        chapter: 2,
+        title: "照片裡的陌生人",
+        name: "旁白",
+        background: "classroom",
+        character: "柳如煙",
+        expression: "normal",
+        text: "當你經過她的座位時，她抬頭看了你一眼，隨即把刊物稍微合起來，像是不確定該不該讓你看見裡面的內容。",
         choices: [
             {
                 text: "問她正在看什麼，並仔細看看刊物",
@@ -1142,6 +1358,7 @@ const storyScenes = [
     // ==============================
     // 第 20 幕
     // ==============================
+    // 第 20 段（1/2 幕）
     {
         chapter: 2,
         title: "照片裡的陌生人",
@@ -1149,7 +1366,18 @@ const storyScenes = [
         background: "rainy_school",
         character: "柳如煙",
         expression: "normal",
-        text: "放學前，天空忽然暗了下來。窗外傳來細碎的雨聲，同學們紛紛拿出雨傘。柳如煙停下手邊的動作，望向窗外，似乎比平常多看了一會兒。雨滴沿著玻璃滑落，她的指尖也跟著輕輕敲了幾下桌面，像是在配合某段只有她自己聽得見的節奏。",
+        text: "放學前，天空忽然暗了下來。窗外傳來細碎的雨聲，同學們紛紛拿出雨傘。柳如煙停下手邊的動作，望向窗外，似乎比平常多看了一會兒。",
+        choices: []
+    },
+    // 第 20 段（2/2 幕）
+    {
+        chapter: 2,
+        title: "照片裡的陌生人",
+        name: "旁白",
+        background: "rainy_school",
+        character: "柳如煙",
+        expression: "normal",
+        text: "雨滴沿著玻璃滑落，她的指尖也跟著輕輕敲了幾下桌面，像是在配合某段只有她自己聽得見的節奏。",
         choices: [
             {
                 text: "問她喜不喜歡下雨天",
@@ -1190,6 +1418,7 @@ const storyScenes = [
     // ==============================
     // 第 21 幕
     // ==============================
+    // 第 21 段（1/2 幕）
     {
         chapter: 2,
         title: "照片裡的陌生人",
@@ -1197,7 +1426,18 @@ const storyScenes = [
         background: "rainy_school",
         character: "柳如煙",
         expression: "normal",
-        text: "雨勢逐漸變小。你和柳如煙在校門附近遇見，她正站在屋簷下看著遠處的天空。聽見你的腳步聲，她轉過頭，神情恢復了平常的模樣。地面還留著雨水，路旁的樹葉被洗得發亮，空氣裡帶著一股潮濕的氣味。",
+        text: "雨勢逐漸變小。你和柳如煙在校門附近遇見，她正站在屋簷下看著遠處的天空。聽見你的腳步聲，她轉過頭，神情恢復了平常的模樣。",
+        choices: []
+    },
+    // 第 21 段（2/2 幕）
+    {
+        chapter: 2,
+        title: "照片裡的陌生人",
+        name: "旁白",
+        background: "rainy_school",
+        character: "柳如煙",
+        expression: "normal",
+        text: "地面還留著雨水，路旁的樹葉被洗得發亮，空氣裡帶著一股潮濕的氣味。",
         choices: [
             {
                 text: "邀請她一起走到車站",
@@ -1250,6 +1490,7 @@ const storyScenes = [
         // ==============================
     // 第 22 幕：借來的筆記
     // ==============================
+    // 第 22 段（1/2 幕）
     {
         chapter: 2,
         title: "照片裡的陌生人",
@@ -1257,7 +1498,18 @@ const storyScenes = [
         background: "classroom",
         character: "柳如煙",
         expression: "normal",
-        text: "隔天上課前，柳如煙拿著課本走到你桌邊。「昨天老師說的那個地方，我好像還是不太懂。」她把筆記本放在桌上，指著其中一段。「你可以跟我說一下嗎？」你注意到她的筆記本裡夾著一張折起來的紙，邊緣已經泛黃。她似乎很在意那張紙，卻沒有主動提起。",
+        text: "隔天上課前，柳如煙拿著課本走到你桌邊。「昨天老師說的那個地方，我好像還是不太懂。」她把筆記本放在桌上，指著其中一段。",
+        choices: []
+    },
+    // 第 22 段（2/2 幕）
+    {
+        chapter: 2,
+        title: "照片裡的陌生人",
+        name: "旁白",
+        background: "classroom",
+        character: "柳如煙",
+        expression: "normal",
+        text: "「你可以跟我說一下嗎？」你注意到她的筆記本裡夾著一張折起來的紙，邊緣已經泛黃。她似乎很在意那張紙，卻沒有主動提起。",
         choices: [
             {
                 text: "耐心幫她整理重點，順便問她那張泛黃的紙",
@@ -1300,6 +1552,7 @@ const storyScenes = [
     // ==============================
     // 第 23 幕：奇怪的小習慣
     // ==============================
+    // 第 23 段（1/3 幕）
     {
         chapter: 2,
         title: "照片裡的陌生人",
@@ -1307,7 +1560,29 @@ const storyScenes = [
         background: "classroom",
         character: "柳如煙",
         expression: "normal",
-        text: "午休時，你和柳如煙坐在教室裡聊天。她一邊思考，一邊用手指輕輕敲著桌面，節奏不快，卻像是有固定的規律。過了一會兒，她似乎察覺到你的視線，便停下動作。奇怪的是，你看著她的手指，腦海裡竟閃過一個模糊的畫面：小時候，好像也有一個人總在想事情時做出相同的動作。",
+        text: "午休時，你和柳如煙坐在教室裡聊天。她一邊思考，一邊用手指輕輕敲著桌面，節奏不快，卻像是有固定的規律。",
+        choices: []
+    },
+    // 第 23 段（2/3 幕）
+    {
+        chapter: 2,
+        title: "照片裡的陌生人",
+        name: "旁白",
+        background: "classroom",
+        character: "柳如煙",
+        expression: "normal",
+        text: "過了一會兒，她似乎察覺到你的視線，便停下動作。",
+        choices: []
+    },
+    // 第 23 段（3/3 幕）
+    {
+        chapter: 2,
+        title: "照片裡的陌生人",
+        name: "旁白",
+        background: "classroom",
+        character: "柳如煙",
+        expression: "normal",
+        text: "奇怪的是，你看著她的手指，腦海裡竟閃過一個模糊的畫面：小時候，好像也有一個人總在想事情時做出相同的動作。",
         choices: [
             {
                 text: "笑著問她在敲什麼節奏",
@@ -1351,6 +1626,7 @@ const storyScenes = [
     // ==============================
     // 第 24 幕：社團活動
     // ==============================
+    // 第 24 段（1/2 幕）
     {
         chapter: 2,
         title: "照片裡的陌生人",
@@ -1358,7 +1634,18 @@ const storyScenes = [
         background: "classroom",
         character: "柳如煙",
         expression: "normal",
-        text: "班上開始討論下週的社團成果展示。柳如煙拿著活動表走到你面前。「你會去看嗎？聽說今年有不少有趣的作品。」她說得自然，卻像是在等你的回答。活動表上除了各社團的展示時間，還有一個特別的項目：舊校園照片展。她的目光在那幾個字上停留片刻，才重新看向你。",
+        text: "班上開始討論下週的社團成果展示。柳如煙拿著活動表走到你面前。「你會去看嗎？聽說今年有不少有趣的作品。」她說得自然，卻像是在等你的回答。",
+        choices: []
+    },
+    // 第 24 段（2/2 幕）
+    {
+        chapter: 2,
+        title: "照片裡的陌生人",
+        name: "旁白",
+        background: "classroom",
+        character: "柳如煙",
+        expression: "normal",
+        text: "活動表上除了各社團的展示時間，還有一個特別的項目：舊校園照片展。她的目光在那幾個字上停留片刻，才重新看向你。",
         choices: [
             {
                 text: "答應和她一起去看，順便問問舊照片展",
@@ -1407,6 +1694,7 @@ const storyScenes = [
     // ==============================
     // 第 25 幕：舊校刊
     // ==============================
+    // 第 25 段（1/3 幕）
     {
         chapter: 2,
         title: "照片裡的陌生人",
@@ -1414,7 +1702,29 @@ const storyScenes = [
         background: "library",
         character: "柳如煙",
         expression: "normal",
-        text: "圖書館裡，你們翻閱著歷年的校刊，尋找社團成果展示的資料。某一頁記錄著多年前的校園活動，照片中的學生笑得燦爛，背景裡還能看見熟悉的校舍。翻到星空活動的紀錄時，你發現照片角落有兩個孩子站在老樹下，其中一人的手裡拿著一張紙。照片下方的日期已經模糊，只剩下部分數字。柳如煙看著照片，久久沒有翻頁。",
+        text: "圖書館裡，你們翻閱著歷年的校刊，尋找社團成果展示的資料。某一頁記錄著多年前的校園活動，照片中的學生笑得燦爛，背景裡還能看見熟悉的校舍。",
+        choices: []
+    },
+    // 第 25 段（2/3 幕）
+    {
+        chapter: 2,
+        title: "照片裡的陌生人",
+        name: "旁白",
+        background: "library",
+        character: "柳如煙",
+        expression: "normal",
+        text: "翻到星空活動的紀錄時，你發現照片角落有兩個孩子站在老樹下，其中一人的手裡拿著一張紙。照片下方的日期已經模糊，只剩下部分數字。",
+        choices: []
+    },
+    // 第 25 段（3/3 幕）
+    {
+        chapter: 2,
+        title: "照片裡的陌生人",
+        name: "旁白",
+        background: "library",
+        character: "柳如煙",
+        expression: "normal",
+        text: "柳如煙看著照片，久久沒有翻頁。",
         choices: [
             {
                 text: "仔細閱讀活動紀錄，詢問柳如煙認不認得照片裡的人",
@@ -1458,6 +1768,7 @@ const storyScenes = [
     // ==============================
     // 第 26 幕：沒說出口的話
     // ==============================
+    // 第 26 段（1/3 幕）
     {
         chapter: 2,
         title: "照片裡的陌生人",
@@ -1465,7 +1776,29 @@ const storyScenes = [
         background: "library",
         character: "柳如煙",
         expression: "normal",
-        text: "離開圖書館時，柳如煙忽然叫住你。「欸，我有件事想問你……」她說到一半又停了下來，低頭看著手中的校刊。那張星空活動的照片仍留在她的腦海裡，照片中的兩個孩子，以及那個模糊的日期，似乎都和她遺失的記憶有關。她握緊校刊，最後只是搖搖頭。「算了，等我想清楚再說吧。」",
+        text: "離開圖書館時，柳如煙忽然叫住你。「欸，我有件事想問你……」她說到一半又停了下來，低頭看著手中的校刊。",
+        choices: []
+    },
+    // 第 26 段（2/3 幕）
+    {
+        chapter: 2,
+        title: "照片裡的陌生人",
+        name: "柳如煙",
+        background: "library",
+        character: "柳如煙",
+        expression: "normal",
+        text: "那張星空活動的照片仍留在她的腦海裡，照片中的兩個孩子，以及那個模糊的日期，似乎都和她遺失的記憶有關。她握緊校刊，最後只是搖搖頭。",
+        choices: []
+    },
+    // 第 26 段（3/3 幕）
+    {
+        chapter: 2,
+        title: "照片裡的陌生人",
+        name: "柳如煙",
+        background: "library",
+        character: "柳如煙",
+        expression: "normal",
+        text: "「算了，等我想清楚再說吧。」",
         choices: [
             {
                 text: "告訴她，你願意聽她說",
@@ -1502,6 +1835,7 @@ const storyScenes = [
     // ==============================
     // 第 27 幕：模糊的夢
     // ==============================
+    // 第 27 段（1/3 幕）
     {
         chapter: 3,
         title: "被遺忘的回憶",
@@ -1509,7 +1843,29 @@ const storyScenes = [
         background: "bedroom",
         character: "柳如煙",
         expression: "normal",
-        text: "那天晚上，你躺在床上，腦海裡不斷浮現柳如煙在圖書館裡的表情。她說自己正在尋找一個人，而那個人曾經和她約好，長大後要一起看星星。不知道為什麼，聽見這件事時，你的心裡竟然產生一種說不出的熟悉感。你閉上眼睛，意識逐漸模糊。夢裡，你回到一座陌生又熟悉的校園。一棵高大的老樹下，有個看不清臉的女孩正站在那裡。她似乎等了很久，終於抬起頭問：「你真的會再來嗎？」",
+        text: "那天晚上，你躺在床上，腦海裡不斷浮現柳如煙在圖書館裡的表情。她說自己正在尋找一個人，而那個人曾經和她約好，長大後要一起看星星。",
+        choices: []
+    },
+    // 第 27 段（2/3 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "bedroom",
+        character: "柳如煙",
+        expression: "normal",
+        text: "不知道為什麼，聽見這件事時，你的心裡竟然產生一種說不出的熟悉感。你閉上眼睛，意識逐漸模糊。",
+        choices: []
+    },
+    // 第 27 段（3/3 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "dream_campus",
+        character: "柳如煙",
+        expression: "normal",
+        text: "夢裡，你回到一座陌生又熟悉的校園。一棵高大的老樹下，有個看不清臉的女孩正站在那裡。她似乎等了很久，終於抬起頭問：「你真的會再來嗎？」",
         choices: [
             {
                 text: "走向女孩，答應一定會再回來",
@@ -1546,6 +1902,7 @@ const storyScenes = [
     // ==============================
     // 第 28 幕：似曾相識的動作
     // ==============================
+    // 第 28 段（1/3 幕）
     {
         chapter: 3,
         title: "被遺忘的回憶",
@@ -1553,7 +1910,29 @@ const storyScenes = [
         background: "classroom",
         character: "柳如煙",
         expression: "normal",
-        text: "隔天早上，你帶著昨晚的夢境走進教室。柳如煙已經坐在位置上，正低頭整理筆記。聽見你的腳步聲，她抬起頭，像往常一樣向你打招呼。你原本想把夢裡的事情告訴她，卻在看見她手上的動作時愣住了。她一邊思考，一邊用手指輕敲桌面，節奏和夢裡那個女孩敲擊紙張的聲音幾乎一樣。察覺到你的視線後，她停下動作，疑惑地問：「怎麼了？我臉上有東西嗎？」",
+        text: "隔天早上，你帶著昨晚的夢境走進教室。柳如煙已經坐在位置上，正低頭整理筆記。聽見你的腳步聲，她抬起頭，像往常一樣向你打招呼。",
+        choices: []
+    },
+    // 第 28 段（2/3 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "柳如煙",
+        background: "classroom",
+        character: "柳如煙",
+        expression: "normal",
+        text: "你原本想把夢裡的事情告訴她，卻在看見她手上的動作時愣住了。她一邊思考，一邊用手指輕敲桌面，節奏和夢裡那個女孩敲擊紙張的聲音幾乎一樣。",
+        choices: []
+    },
+    // 第 28 段（3/3 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "柳如煙",
+        background: "classroom",
+        character: "柳如煙",
+        expression: "normal",
+        text: "察覺到你的視線後，她停下動作，疑惑地問：「怎麼了？我臉上有東西嗎？」",
         choices: [
             {
                 text: "告訴她昨晚夢見一個站在老樹下的女孩",
@@ -1590,6 +1969,7 @@ const storyScenes = [
     // ==============================
     // 第 29 幕：記憶中的雨聲
     // ==============================
+    // 第 29 段（1/4 幕）
     {
         chapter: 3,
         title: "被遺忘的回憶",
@@ -1597,7 +1977,40 @@ const storyScenes = [
         background: "classroom",
         character: "柳如煙",
         expression: "normal",
-        text: "午休時，窗外忽然下起細雨。教室裡的同學大多出去買午餐，只剩下零星幾個人留在座位上。柳如煙望著窗外，手指輕輕敲著桌面，像是在聽某種只有她熟悉的節奏。過了一會兒，她忽然開口：「你有沒有過這種感覺？明明已經忘記一件事情很久了，可是某一天，只要聽見一個聲音，就會突然覺得自己好像曾經經歷過什麼。」她轉過頭看著你。「你相信記憶會自己回來嗎？」",
+        text: "午休時，窗外忽然下起細雨。教室裡的同學大多出去買午餐，只剩下零星幾個人留在座位上。",
+        choices: []
+    },
+    // 第 29 段（2/4 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "classroom",
+        character: "柳如煙",
+        expression: "normal",
+        text: "柳如煙望著窗外，手指輕輕敲著桌面，像是在聽某種只有她熟悉的節奏。",
+        choices: []
+    },
+    // 第 29 段（3/4 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "classroom",
+        character: "柳如煙",
+        expression: "normal",
+        text: "過了一會兒，她忽然開口：「你有沒有過這種感覺？明明已經忘記一件事情很久了，可是某一天，只要聽見一個聲音，就會突然覺得自己好像曾經經歷過什麼。」",
+        choices: []
+    },
+    // 第 29 段（4/4 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "classroom",
+        character: "柳如煙",
+        expression: "normal",
+        text: "她轉過頭看著你。「你相信記憶會自己回來嗎？」",
         choices: [
             {
                 text: "相信記憶會慢慢回來，重要的事不會完全消失",
@@ -1638,14 +2051,48 @@ const storyScenes = [
     // ==============================
     // 第 30 幕：不該忘記的約定
     // ==============================
+    // 第 30 段（1/4 幕）
     {
         chapter: 3,
         title: "被遺忘的回憶",
         name: "旁白",
-        background: "hallway",
+        background: "classroom",
         character: "柳如煙",
         expression: "normal",
-        text: "下午放學前，老師臨時宣布隔天要交一份小組報告。你和幾名同學留下來討論分工，柳如煙也在其中。討論到一半，有人抱怨事情太多，笑著說：「反正只是隨便答應的事，忘了也沒差吧。」你順口回了一句：「既然答應了，就應該努力做到啊。」話才剛說完，柳如煙手中的筆便掉到了地上。她彎腰撿起筆，卻沒有立刻站起來。等其他同學離開後，她才低聲問你：「你一直都是這樣的人嗎？就算已經忘記當初為什麼答應，也會努力做到？」",
+        text: "下午放學前，老師臨時宣布隔天要交一份小組報告。你和幾名同學留下來討論分工，柳如煙也在其中。",
+        choices: []
+    },
+    // 第 30 段（2/4 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "classroom",
+        character: "柳如煙",
+        expression: "normal",
+        text: "討論到一半，有人抱怨事情太多，笑著說：「反正只是隨便答應的事，忘了也沒差吧。」你順口回了一句：「既然答應了，就應該努力做到啊。」",
+        choices: []
+    },
+    // 第 30 段（3/4 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "classroom",
+        character: "柳如煙",
+        expression: "normal",
+        text: "話才剛說完，柳如煙手中的筆便掉到了地上。她彎腰撿起筆，卻沒有立刻站起來。",
+        choices: []
+    },
+    // 第 30 段（4/4 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "classroom",
+        character: "柳如煙",
+        expression: "normal",
+        text: "等其他同學離開後，她才低聲問你：「你一直都是這樣的人嗎？就算已經忘記當初為什麼答應，也會努力做到？」",
         choices: [
             {
                 text: "認真回答，答應別人的事就不該輕易忘記",
@@ -1682,6 +2129,7 @@ const storyScenes = [
     // ==============================
     // 第 31 幕：沒有寄出的信
     // ==============================
+    // 第 31 段（1/3 幕）
     {
         chapter: 3,
         title: "被遺忘的回憶",
@@ -1689,7 +2137,29 @@ const storyScenes = [
         background: "library",
         character: "柳如煙",
         expression: "normal",
-        text: "隔天放學，你到圖書館歸還參考書，卻意外看見柳如煙坐在靠窗的位置。她面前攤著幾本舊校刊和一本泛黃的筆記本，桌上還放著一張寫滿字的便條紙。她似乎正在比對不同年份的校園活動紀錄，眉頭越皺越緊。你走近時，她立刻把便條紙翻了過去。「你怎麼在這裡？」她問得有些突然，隨後才發現自己的語氣不太自然。「我只是想查一些以前的資料。」",
+        text: "隔天放學，你到圖書館歸還參考書，卻意外看見柳如煙坐在靠窗的位置。她面前攤著幾本舊校刊和一本泛黃的筆記本，桌上還放著一張寫滿字的便條紙。",
+        choices: []
+    },
+    // 第 31 段（2/3 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "library",
+        character: "柳如煙",
+        expression: "normal",
+        text: "她似乎正在比對不同年份的校園活動紀錄，眉頭越皺越緊。你走近時，她立刻把便條紙翻了過去。「你怎麼在這裡？」",
+        choices: []
+    },
+    // 第 31 段（3/3 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "library",
+        character: "柳如煙",
+        expression: "normal",
+        text: "她問得有些突然，隨後才發現自己的語氣不太自然。「我只是想查一些以前的資料。」",
         choices: [
             {
                 text: "坦白告訴她自己看見了便條紙，問她需要幫忙嗎",
@@ -1726,6 +2196,7 @@ const storyScenes = [
     // ==============================
     // 第 32 幕：被遺忘的地方
     // ==============================
+    // 第 32 段（1/4 幕）
     {
         chapter: 3,
         title: "被遺忘的回憶",
@@ -1733,7 +2204,40 @@ const storyScenes = [
         background: "old_community_center",
         character: "柳如煙",
         expression: "normal",
-        text: "週末午後，柳如煙傳訊息問你有沒有空，說想帶你去一個地方。你們搭車來到城市邊緣的一處老社區。這裡的店面大多已經關閉，牆上的招牌褪了色，只有幾個老人坐在騎樓下聊天。走過一條狹窄的巷子後，你們停在一棟老舊的社區活動中心前。門口的公告寫著，這裡即將拆除。柳如煙站在門前，遲遲沒有推門。「我不知道自己為什麼還記得這裡。」她低聲說。「可是每次想起小時候，我總覺得自己曾經在這裡等過某個人。」",
+        text: "週末午後，柳如煙傳訊息問你有沒有空，說想帶你去一個地方。你們搭車來到城市邊緣的一處老社區。",
+        choices: []
+    },
+    // 第 32 段（2/4 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "old_community_center",
+        character: "柳如煙",
+        expression: "normal",
+        text: "這裡的店面大多已經關閉，牆上的招牌褪了色，只有幾個老人坐在騎樓下聊天。走過一條狹窄的巷子後，你們停在一棟老舊的社區活動中心前。",
+        choices: []
+    },
+    // 第 32 段（3/4 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "old_community_center",
+        character: "柳如煙",
+        expression: "normal",
+        text: "門口的公告寫著，這裡即將拆除。柳如煙站在門前，遲遲沒有推門。「我不知道自己為什麼還記得這裡。」她低聲說。",
+        choices: []
+    },
+    // 第 32 段（4/4 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "old_community_center",
+        character: "柳如煙",
+        expression: "normal",
+        text: "「可是每次想起小時候，我總覺得自己曾經在這裡等過某個人。」",
         choices: [
             {
                 text: "陪她走進去，一起找找有沒有熟悉的東西",
@@ -1770,6 +2274,7 @@ const storyScenes = [
     // ==============================
     // 第 33 幕：記得那一天的人
     // ==============================
+    // 第 33 段（1/4 幕）
     {
         chapter: 3,
         title: "被遺忘的回憶",
@@ -1777,7 +2282,40 @@ const storyScenes = [
         background: "old_center_room",
         character: "柳如煙",
         expression: "normal",
-        text: "你們在活動中心裡找了一會兒，卻沒有發現明顯的線索。正準備離開時，一名拿著紙箱的老先生從走廊另一頭走來。他看見柳如煙，忽然停下腳步。「妳是……以前常來這裡的那個小女孩？」柳如煙愣住了。「您認得我？」老先生仔細看了她一會兒，點點頭。「我不敢說一定認得，但妳以前常常和一個男孩子來這裡。每次活動結束，兩個人都不肯馬上回家，總說還有事情沒做完。」柳如煙的神情一下子變得認真。「那個男孩子……您還記得他嗎？」老先生皺起眉頭，像是在努力回想。",
+        text: "你們在活動中心裡找了一會兒，卻沒有發現明顯的線索。正準備離開時，一名拿著紙箱的老先生從走廊另一頭走來。他看見柳如煙，忽然停下腳步。",
+        choices: []
+    },
+    // 第 33 段（2/4 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "老管理員",
+        background: "old_center_room",
+        character: "柳如煙",
+        expression: "normal",
+        text: "「妳是……以前常來這裡的那個小女孩？」柳如煙愣住了。「您認得我？」老先生仔細看了她一會兒，點點頭。",
+        choices: []
+    },
+    // 第 33 段（3/4 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "老管理員",
+        background: "old_center_room",
+        character: "柳如煙",
+        expression: "normal",
+        text: "「我不敢說一定認得，但妳以前常常和一個男孩子來這裡。每次活動結束，兩個人都不肯馬上回家，總說還有事情沒做完。」",
+        choices: []
+    },
+    // 第 33 段（4/4 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "老管理員",
+        background: "old_center_room",
+        character: "柳如煙",
+        expression: "normal",
+        text: "柳如煙的神情一下子變得認真。「那個男孩子……您還記得他嗎？」老先生皺起眉頭，像是在努力回想。",
         choices: [
             {
                 text: "請老先生仔細回想，那兩個孩子當年做過什麼",
@@ -1814,6 +2352,7 @@ const storyScenes = [
     // ==============================
     // 第 34 幕：儲藏室裡的紙箱
     // ==============================
+    // 第 34 段（1/4 幕）
     {
         chapter: 3,
         title: "被遺忘的回憶",
@@ -1821,7 +2360,40 @@ const storyScenes = [
         background: "old_center_storage",
         character: "柳如煙",
         expression: "normal",
-        text: "在老先生的帶領下，你們來到走廊盡頭的儲藏室。房間裡堆滿了紙箱，空氣中混著灰塵與紙張的氣味。老先生提醒你們，有些東西還沒整理，找到什麼都先別急著丟掉。柳如煙蹲在一個標著「星空活動」的紙箱前，手指停在箱蓋上。「我不知道裡面會有什麼……」她看了你一眼，勉強笑了笑。「如果真的找到以前的東西，我可能會想起一些事情；但如果什麼都沒有，我又該怎麼辦？」她沒有立刻打開紙箱，而是等著你的回答。",
+        text: "在老先生的帶領下，你們來到走廊盡頭的儲藏室。房間裡堆滿了紙箱，空氣中混著灰塵與紙張的氣味。",
+        choices: []
+    },
+    // 第 34 段（2/4 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "old_center_storage",
+        character: "柳如煙",
+        expression: "normal",
+        text: "老先生提醒你們，有些東西還沒整理，找到什麼都先別急著丟掉。柳如煙蹲在一個標著「星空活動」的紙箱前，手指停在箱蓋上。",
+        choices: []
+    },
+    // 第 34 段（3/4 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "old_center_storage",
+        character: "柳如煙",
+        expression: "normal",
+        text: "「我不知道裡面會有什麼……」她看了你一眼，勉強笑了笑。「如果真的找到以前的東西，我可能會想起一些事情；但如果什麼都沒有，我又該怎麼辦？」",
+        choices: []
+    },
+    // 第 34 段（4/4 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "old_center_storage",
+        character: "柳如煙",
+        expression: "normal",
+        text: "她沒有立刻打開紙箱，而是等著你的回答。",
         choices: [
             {
                 text: "告訴她，不管找到什麼，你都會陪她一起面對",
@@ -1858,6 +2430,7 @@ const storyScenes = [
     // ==============================
     // 第 35 幕：紙袋上的記號
     // ==============================
+    // 第 35 段（1/3 幕）
     {
         chapter: 3,
         title: "被遺忘的回憶",
@@ -1865,7 +2438,29 @@ const storyScenes = [
         background: "old_center_storage",
         character: "柳如煙",
         expression: "normal",
-        text: "那個沒有標籤的小紙袋安靜地躺在紙箱底部。紙袋已經泛黃，封口處還留著一小段褪色的藍色線條。柳如煙伸手想拿起來，卻在碰到紙袋前停住了。「奇怪……我好像在哪裡看過這個記號。」她仔細看著那條藍色線條，眉頭越皺越緊，卻始終想不起來。老先生正在外面整理其他物品，暫時沒有注意到你們。你們有一點時間，可以自己決定接下來怎麼做。",
+        text: "那個沒有標籤的小紙袋安靜地躺在紙箱底部。紙袋已經泛黃，封口處還留著一小段褪色的藍色線條。柳如煙伸手想拿起來，卻在碰到紙袋前停住了。",
+        choices: []
+    },
+    // 第 35 段（2/3 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "old_center_storage",
+        character: "柳如煙",
+        expression: "normal",
+        text: "「奇怪……我好像在哪裡看過這個記號。」她仔細看著那條藍色線條，眉頭越皺越緊，卻始終想不起來。",
+        choices: []
+    },
+    // 第 35 段（3/3 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "old_center_storage",
+        character: "柳如煙",
+        expression: "normal",
+        text: "老先生正在外面整理其他物品，暫時沒有注意到你們。你們有一點時間，可以自己決定接下來怎麼做。",
         choices: [
             {
                 text: "仔細檢查紙袋上的藍色記號，試著找出規律",
@@ -1902,6 +2497,7 @@ const storyScenes = [
     // ==============================
     // 第 36 幕：星圖上缺少的星星
     // ==============================
+    // 第 36 段（1/4 幕）
     {
         chapter: 3,
         title: "被遺忘的回憶",
@@ -1909,7 +2505,40 @@ const storyScenes = [
         background: "old_center_storage",
         character: "柳如煙",
         expression: "normal",
-        text: "你們沒有急著離開，而是繼續翻找紙箱裡的舊物品。柳如煙把那張寫著「北方……第三顆……」的紙片放在桌上，旁邊則攤開一張當年的星空活動海報。海報上畫著幾條簡單的星座連線，右上角還標示著觀測方向。你試著比對紙片和海報，卻發現海報上的星星排列似乎少了一個記號。柳如煙拿起紙片，反覆看了幾遍。「如果這不是活動紀錄，而是某個人特別留下的提示呢？」她抬頭看向你。「你覺得，我們應該先相信紙片上的文字，還是先弄清楚這張星圖原本畫了什麼？」",
+        text: "你們沒有急著離開，而是繼續翻找紙箱裡的舊物品。柳如煙把那張寫著「北方……第三顆……」的紙片放在桌上，旁邊則攤開一張當年的星空活動海報。",
+        choices: []
+    },
+    // 第 36 段（2/4 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "old_center_storage",
+        character: "柳如煙",
+        expression: "normal",
+        text: "海報上畫著幾條簡單的星座連線，右上角還標示著觀測方向。你試著比對紙片和海報，卻發現海報上的星星排列似乎少了一個記號。",
+        choices: []
+    },
+    // 第 36 段（3/4 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "old_center_storage",
+        character: "柳如煙",
+        expression: "normal",
+        text: "柳如煙拿起紙片，反覆看了幾遍。「如果這不是活動紀錄，而是某個人特別留下的提示呢？」她抬頭看向你。",
+        choices: []
+    },
+    // 第 36 段（4/4 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "old_center_storage",
+        character: "柳如煙",
+        expression: "normal",
+        text: "「你覺得，我們應該先相信紙片上的文字，還是先弄清楚這張星圖原本畫了什麼？」",
         choices: [
             {
                 text: "先研究星圖，找出被刪掉的記號可能在哪裡",
@@ -1946,6 +2575,7 @@ const storyScenes = [
     // ==============================
     // 第 37 幕：雨聲裡的習慣
     // ==============================
+    // 第 37 段（1/5 幕）
     {
         chapter: 3,
         title: "被遺忘的回憶",
@@ -1953,7 +2583,51 @@ const storyScenes = [
         background: "old_center_window_rain",
         character: "柳如煙",
         expression: "normal",
-        text: "你們整理完紙箱時，窗外忽然下起雨。雨滴打在老舊的鐵皮屋頂上，發出規律的聲響。柳如煙原本還在研究那張星圖，聽見雨聲後，手指卻不自覺地在桌面上輕敲了幾下。她自己似乎也察覺到了，慢慢停下動作。「好奇怪……我以前好像常常和一個人一起聽雨。」她望向窗外，眼神有些迷惘。「那個人每次想事情的時候，也會這樣敲手指。我一直記得這個習慣，卻怎麼也想不起他的臉。」她轉過頭看你，猶豫了一會兒。「你會不會也有某個人，明明想不起來了，卻還記得他做過的小事？」",
+        text: "你們整理完紙箱時，窗外忽然下起雨。雨滴打在老舊的鐵皮屋頂上，發出規律的聲響。",
+        choices: []
+    },
+    // 第 37 段（2/5 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "old_center_window_rain",
+        character: "柳如煙",
+        expression: "normal",
+        text: "柳如煙原本還在研究那張星圖，聽見雨聲後，手指卻不自覺地在桌面上輕敲了幾下。她自己似乎也察覺到了，慢慢停下動作。",
+        choices: []
+    },
+    // 第 37 段（3/5 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "old_center_window_rain",
+        character: "柳如煙",
+        expression: "normal",
+        text: "「好奇怪……我以前好像常常和一個人一起聽雨。」她望向窗外，眼神有些迷惘。",
+        choices: []
+    },
+    // 第 37 段（4/5 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "old_center_window_rain",
+        character: "柳如煙",
+        expression: "normal",
+        text: "「那個人每次想事情的時候，也會這樣敲手指。我一直記得這個習慣，卻怎麼也想不起他的臉。」她轉過頭看你，猶豫了一會兒。",
+        choices: []
+    },
+    // 第 37 段（5/5 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "old_center_window_rain",
+        character: "柳如煙",
+        expression: "normal",
+        text: "「你會不會也有某個人，明明想不起來了，卻還記得他做過的小事？」",
         choices: [
             {
                 text: "告訴她，自己也注意過她敲手指的習慣",
@@ -1990,14 +2664,48 @@ const storyScenes = [
     // ==============================
     // 第 38 幕：被留下的日期
     // ==============================
+    // 第 38 段（1/4 幕）
     {
         chapter: 3,
         title: "被遺忘的回憶",
         name: "老管理員",
-        background: "old_center_room",
+        background: "old_center_storage",
         character: "柳如煙",
         expression: "normal",
-        text: "雨勢稍微變小後，老先生抱著一本厚厚的紀錄簿走進儲藏室。「我剛才在辦公室找到這個，或許對你們有幫助。」他把紀錄簿放在桌上，封面寫著多年前的活動年份。柳如煙立刻翻開，裡面記錄著每次活動的日期、參加人數，以及一些簡短的備註。翻到星空活動的那一頁時，她忽然停住了。那天的備註旁畫著一顆小小的星星，下面還寫著一句話：「活動結束後，兩名孩子留下，表示有重要的約定。」柳如煙盯著那行字，久久沒有說話。她終於找到一項確實存在的紀錄，卻仍然不知道那個約定究竟是什麼。",
+        text: "雨勢稍微變小後，老先生抱著一本厚厚的紀錄簿走進儲藏室。「我剛才在辦公室找到這個，或許對你們有幫助。」",
+        choices: []
+    },
+    // 第 38 段（2/4 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "老管理員",
+        background: "old_center_storage",
+        character: "柳如煙",
+        expression: "normal",
+        text: "他把紀錄簿放在桌上，封面寫著多年前的活動年份。柳如煙立刻翻開，裡面記錄著每次活動的日期、參加人數，以及一些簡短的備註。",
+        choices: []
+    },
+    // 第 38 段（3/4 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "老管理員",
+        background: "old_center_storage",
+        character: "柳如煙",
+        expression: "normal",
+        text: "翻到星空活動的那一頁時，她忽然停住了。那天的備註旁畫著一顆小小的星星，下面還寫著一句話：「活動結束後，兩名孩子留下，表示有重要的約定。」",
+        choices: []
+    },
+    // 第 38 段（4/4 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "老管理員",
+        background: "old_center_storage",
+        character: "柳如煙",
+        expression: "normal",
+        text: "柳如煙盯著那行字，久久沒有說話。她終於找到一項確實存在的紀錄，卻仍然不知道那個約定究竟是什麼。",
         choices: [
             {
                 text: "仔細記下活動日期，並和之前的星圖互相比對",
@@ -2034,6 +2742,7 @@ const storyScenes = [
     // ==============================
     // 第 39 幕：河堤上的舊地址
     // ==============================
+    // 第 39 段（1/5 幕）
     {
         chapter: 3,
         title: "被遺忘的回憶",
@@ -2041,7 +2750,51 @@ const storyScenes = [
         background: "riverside_evening",
         character: "柳如煙",
         expression: "normal",
-        text: "離開活動中心前，老先生忽然想起一件事。他說，當年有些孩子會在活動結束後，沿著河堤走到附近的舊觀景台。那裡曾經是社區居民觀星的地方，後來因為設施老舊，已經很少有人前往。你們照著老先生指的方向走去。傍晚的河面映著夕陽，遠處的路燈一盞盞亮起。柳如煙站在欄杆旁，望著河水出神。「我好像來過這裡。」她說。「以前有個人告訴我，只要站在這裡，就能看見很漂亮的星空。」她停頓了一下，接著苦笑：「可是我不記得那個人是誰，也不記得我們最後有沒有真的看見星星。」",
+        text: "離開活動中心前，老先生忽然想起一件事。他說，當年有些孩子會在活動結束後，沿著河堤走到附近的舊觀景台。",
+        choices: []
+    },
+    // 第 39 段（2/5 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "riverside_evening",
+        character: "柳如煙",
+        expression: "normal",
+        text: "那裡曾經是社區居民觀星的地方，後來因為設施老舊，已經很少有人前往。",
+        choices: []
+    },
+    // 第 39 段（3/5 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "riverside_evening",
+        character: "柳如煙",
+        expression: "normal",
+        text: "你們照著老先生指的方向走去。傍晚的河面映著夕陽，遠處的路燈一盞盞亮起。柳如煙站在欄杆旁，望著河水出神。「我好像來過這裡。」她說。",
+        choices: []
+    },
+    // 第 39 段（4/5 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "riverside_evening",
+        character: "柳如煙",
+        expression: "normal",
+        text: "「以前有個人告訴我，只要站在這裡，就能看見很漂亮的星空。」",
+        choices: []
+    },
+    // 第 39 段（5/5 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "riverside_evening",
+        character: "柳如煙",
+        expression: "normal",
+        text: "她停頓了一下，接著苦笑：「可是我不記得那個人是誰，也不記得我們最後有沒有真的看見星星。」",
         choices: [
             {
                 text: "問她是否記得那個人曾經說過的其他話",
@@ -2078,6 +2831,7 @@ const storyScenes = [
     // ==============================
     // 第 40 幕：第三顆星
     // ==============================
+    // 第 40 段（1/4 幕）
     {
         chapter: 3,
         title: "被遺忘的回憶",
@@ -2085,7 +2839,40 @@ const storyScenes = [
         background: "old_observatory_platform",
         character: "柳如煙",
         expression: "normal",
-        text: "你們沿著河堤旁的小路走上舊觀景台。木製欄杆已經斑駁，角落還留著一張褪色的星空導覽圖。柳如煙站在導覽圖前，輕輕拂去表面的灰塵。圖上標示著幾個方向，北方的位置畫著一組排列成線的星星。她忽然想起儲藏室裡的紙片，低聲念道：「北方……第三顆……」她沿著圖上的星星一顆顆數過去，卻發現第三顆的位置被刮掉了一部分，只剩下淡淡的痕跡。柳如煙伸手碰了碰那道刮痕，眼神逐漸認真起來。「如果這真的是留下來的提示，那麼有人可能希望我找到這顆星。」她轉頭問你：「你覺得，我們應該先研究這張圖，還是先想辦法找回被刮掉的部分？」",
+        text: "你們沿著河堤旁的小路走上舊觀景台。木製欄杆已經斑駁，角落還留著一張褪色的星空導覽圖。柳如煙站在導覽圖前，輕輕拂去表面的灰塵。",
+        choices: []
+    },
+    // 第 40 段（2/4 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "old_observatory_platform",
+        character: "柳如煙",
+        expression: "normal",
+        text: "圖上標示著幾個方向，北方的位置畫著一組排列成線的星星。她忽然想起儲藏室裡的紙片，低聲念道：「北方……第三顆……」",
+        choices: []
+    },
+    // 第 40 段（3/4 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "old_observatory_platform",
+        character: "柳如煙",
+        expression: "normal",
+        text: "她沿著圖上的星星一顆顆數過去，卻發現第三顆的位置被刮掉了一部分，只剩下淡淡的痕跡。柳如煙伸手碰了碰那道刮痕，眼神逐漸認真起來。",
+        choices: []
+    },
+    // 第 40 段（4/4 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "old_observatory_platform",
+        character: "柳如煙",
+        expression: "normal",
+        text: "「如果這真的是留下來的提示，那麼有人可能希望我找到這顆星。」她轉頭問你：「你覺得，我們應該先研究這張圖，還是先想辦法找回被刮掉的部分？」",
         choices: [
             {
                 text: "仔細比對星圖和紙片上的記號",
@@ -2126,6 +2913,7 @@ const storyScenes = [
     // ==============================
     // 第 41 幕：有人回來過
     // ==============================
+    // 第 41 段（1/4 幕）
     {
         chapter: 3,
         title: "被遺忘的回憶",
@@ -2133,7 +2921,40 @@ const storyScenes = [
         background: "old_observatory_platform",
         character: "柳如煙",
         expression: "normal",
-        text: "你們正準備離開觀景台時，柳如煙忽然注意到導覽圖旁有一個生鏽的小鐵盒。鐵盒被固定在木板後方，外表沾滿灰塵，像是已經放了很久。你們沒有強行拆開，而是仔細查看盒子的外側。盒蓋上有一道較新的刮痕，底部卻已經嚴重鏽蝕，讓人分不清它究竟放了幾年。柳如煙蹲下來，盯著那道刮痕看了很久。「如果這個盒子以前就放在這裡……會不會有人曾經回來找過什麼？」她抬頭看著你，語氣裡有期待，也有不安。「可是，我不想因為太希望找到答案，就把每一件東西都當成證據。」",
+        text: "你們正準備離開觀景台時，柳如煙忽然注意到導覽圖旁有一個生鏽的小鐵盒。鐵盒被固定在木板後方，外表沾滿灰塵，像是已經放了很久。",
+        choices: []
+    },
+    // 第 41 段（2/4 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "柳如煙",
+        background: "old_observatory_platform",
+        character: "柳如煙",
+        expression: "normal",
+        text: "你們沒有強行拆開，而是仔細查看盒子的外側。盒蓋上有一道較新的刮痕，底部卻已經嚴重鏽蝕，讓人分不清它究竟放了幾年。",
+        choices: []
+    },
+    // 第 41 段（3/4 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "柳如煙",
+        background: "old_observatory_platform",
+        character: "柳如煙",
+        expression: "normal",
+        text: "柳如煙蹲下來，盯著那道刮痕看了很久。「如果這個盒子以前就放在這裡……會不會有人曾經回來找過什麼？」她抬頭看著你，語氣裡有期待，也有不安。",
+        choices: []
+    },
+    // 第 41 段（4/4 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "柳如煙",
+        background: "old_observatory_platform",
+        character: "柳如煙",
+        expression: "normal",
+        text: "「可是，我不想因為太希望找到答案，就把每一件東西都當成證據。」",
         choices: [
             {
                 text: "先拍下鐵盒的位置與外觀，找管理單位確認",
@@ -2170,6 +2991,7 @@ const storyScenes = [
     // ==============================
     // 第 42 幕：管理員的舊鑰匙
     // ==============================
+    // 第 42 段（1/5 幕）
     {
         chapter: 3,
         title: "被遺忘的回憶",
@@ -2177,7 +2999,51 @@ const storyScenes = [
         background: "old_center_office",
         character: "柳如煙",
         expression: "normal",
-        text: "你們回到活動中心，把觀景台上發現的鐵盒告訴老先生。老先生聽完後，沉默了一會兒，接著從抽屜裡拿出一本舊物品登記簿。「觀景台以前確實放過一些活動用品，不過那裡的設施後來整修過，很多東西都移走了。」他翻找了幾頁，終於停在一筆模糊的紀錄前。上面寫著：「小型金屬盒一只，暫存觀測紀錄，移交日期不明。」柳如煙立刻靠近桌邊。「那裡面會不會有以前的星圖？」老先生搖搖頭。「有可能，但沒有打開之前，誰也不能確定。」他拿出一把舊鑰匙，卻沒有立刻交給你們。「如果那個盒子確實屬於活動中心，我可以陪你們回去確認。但不能只因為它看起來神祕，就認定裡面一定有你們要找的答案。」",
+        text: "你們回到活動中心，把觀景台上發現的鐵盒告訴老先生。老先生聽完後，沉默了一會兒，接著從抽屜裡拿出一本舊物品登記簿。",
+        choices: []
+    },
+    // 第 42 段（2/5 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "老管理員",
+        background: "old_center_office",
+        character: "柳如煙",
+        expression: "normal",
+        text: "「觀景台以前確實放過一些活動用品，不過那裡的設施後來整修過，很多東西都移走了。」他翻找了幾頁，終於停在一筆模糊的紀錄前。",
+        choices: []
+    },
+    // 第 42 段（3/5 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "老管理員",
+        background: "old_center_office",
+        character: "柳如煙",
+        expression: "normal",
+        text: "上面寫著：「小型金屬盒一只，暫存觀測紀錄，移交日期不明。」柳如煙立刻靠近桌邊。「那裡面會不會有以前的星圖？」老先生搖搖頭。",
+        choices: []
+    },
+    // 第 42 段（4/5 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "老管理員",
+        background: "old_center_office",
+        character: "柳如煙",
+        expression: "normal",
+        text: "「有可能，但沒有打開之前，誰也不能確定。」他拿出一把舊鑰匙，卻沒有立刻交給你們。",
+        choices: []
+    },
+    // 第 42 段（5/5 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "老管理員",
+        background: "old_center_office",
+        character: "柳如煙",
+        expression: "normal",
+        text: "「如果那個盒子確實屬於活動中心，我可以陪你們回去確認。但不能只因為它看起來神祕，就認定裡面一定有你們要找的答案。」",
         choices: [
             {
                 text: "拿出拍下的照片，請老先生核對鐵盒的位置",
@@ -2214,6 +3080,7 @@ const storyScenes = [
     // ==============================
     // 第 43 幕：鐵盒裡的舊紙條
     // ==============================
+    // 第 43 段（1/5 幕）
     {
         chapter: 3,
         title: "被遺忘的回憶",
@@ -2221,7 +3088,51 @@ const storyScenes = [
         background: "old_observatory_platform",
         character: "柳如煙",
         expression: "normal",
-        text: "隔天，老先生帶著鑰匙陪你們回到舊觀景台。他先確認鐵盒確實是活動中心留下的舊物，才小心地將它取下。盒子打開後，裡面沒有想像中的珍貴物品，只有幾張泛黃的觀測紀錄、一小段藍色細繩，以及一張折了兩次的紙條。柳如煙看見紙條時，呼吸忽然停了一瞬。紙條上沒有完整的句子，只寫著：「如果有一天忘記了，就回到我們第一次約定的地方。」下面還畫著一顆小星星。她伸手想拿起紙條，又猶豫地看向老先生。老先生點頭，表示可以先拍照記錄，再把物品妥善保存。柳如煙低聲說：「我們第一次約定的地方……到底是哪裡？」",
+        text: "隔天，老先生帶著鑰匙陪你們回到舊觀景台。他先確認鐵盒確實是活動中心留下的舊物，才小心地將它取下。",
+        choices: []
+    },
+    // 第 43 段（2/5 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "old_observatory_platform",
+        character: "柳如煙",
+        expression: "normal",
+        text: "盒子打開後，裡面沒有想像中的珍貴物品，只有幾張泛黃的觀測紀錄、一小段藍色細繩，以及一張折了兩次的紙條。",
+        choices: []
+    },
+    // 第 43 段（3/5 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "old_observatory_platform",
+        character: "柳如煙",
+        expression: "normal",
+        text: "柳如煙看見紙條時，呼吸忽然停了一瞬。紙條上沒有完整的句子，只寫著：「如果有一天忘記了，就回到我們第一次約定的地方。」",
+        choices: []
+    },
+    // 第 43 段（4/5 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "old_observatory_platform",
+        character: "柳如煙",
+        expression: "normal",
+        text: "下面還畫著一顆小星星。她伸手想拿起紙條，又猶豫地看向老先生。老先生點頭，表示可以先拍照記錄，再把物品妥善保存。",
+        choices: []
+    },
+    // 第 43 段（5/5 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "old_observatory_platform",
+        character: "柳如煙",
+        expression: "normal",
+        text: "柳如煙低聲說：「我們第一次約定的地方……到底是哪裡？」",
         choices: [
             {
                 text: "仔細比對紙條上的星星與之前的星圖",
@@ -2258,6 +3169,18 @@ const storyScenes = [
     // ==============================
     // 第 44 幕：第一次約定的地方
     // ==============================
+    // 第 44 段（1/5 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "柳如煙",
+        background: "old_observatory_platform",
+        character: "柳如煙",
+        expression: "normal",
+        text: "離開觀景台後，柳如煙一路看著手機裡拍下的紙條。",
+        choices: []
+    },
+    // 第 44 段（2/5 幕）
     {
         chapter: 3,
         title: "被遺忘的回憶",
@@ -2265,7 +3188,40 @@ const storyScenes = [
         background: "old_neighborhood_park",
         character: "柳如煙",
         expression: "normal",
-        text: "離開觀景台後，柳如煙一路看著手機裡拍下的紙條。走到老社區附近時，她忽然停下腳步，望向一座藏在巷子裡的小公園。公園裡的遊具早已換過，只有角落那棵老樹還留著熟悉的枝幹。她慢慢走近樹下，伸手摸了摸粗糙的樹皮。「我好像……曾經在這裡等過一個人。」她閉上眼睛，努力回想。「那天好像下著雨，我們躲在樹下，聊到長大以後要做什麼。後來，他說要帶我去看星星。」她睜開眼睛，卻仍然想不起那個人的臉。「我不知道這是不是第一次約定的地方，但這裡的感覺……真的很熟悉。」",
+        text: "走到老社區附近時，她忽然停下腳步，望向一座藏在巷子裡的小公園。公園裡的遊具早已換過，只有角落那棵老樹還留著熟悉的枝幹。",
+        choices: []
+    },
+    // 第 44 段（3/5 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "柳如煙",
+        background: "old_neighborhood_park",
+        character: "柳如煙",
+        expression: "normal",
+        text: "她慢慢走近樹下，伸手摸了摸粗糙的樹皮。「我好像……曾經在這裡等過一個人。」她閉上眼睛，努力回想。",
+        choices: []
+    },
+    // 第 44 段（4/5 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "柳如煙",
+        background: "old_neighborhood_park",
+        character: "柳如煙",
+        expression: "normal",
+        text: "「那天好像下著雨，我們躲在樹下，聊到長大以後要做什麼。後來，他說要帶我去看星星。」她睜開眼睛，卻仍然想不起那個人的臉。",
+        choices: []
+    },
+    // 第 44 段（5/5 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "柳如煙",
+        background: "old_neighborhood_park",
+        character: "柳如煙",
+        expression: "normal",
+        text: "「我不知道這是不是第一次約定的地方，但這裡的感覺……真的很熟悉。」",
         choices: [
             {
                 text: "問她能不能想起那天約定的具體內容",
@@ -2302,6 +3258,29 @@ const storyScenes = [
     // ==============================
     // 第 45 幕：記憶中的那個男孩
     // ==============================
+    // 第 45 段（1/6 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "bedroom",
+        character: "柳如煙",
+        expression: "normal",
+        text: "那天晚上，你回到家後，腦海裡一直浮現小公園的老樹。你打開手機，重新看過這幾天拍下的照片：星圖、紙條、鐵盒，還有石椅底部的小星星。",
+        choices: []
+    },
+    // 第 45 段（2/6 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "bedroom",
+        character: "柳如煙",
+        expression: "normal",
+        text: "雨聲從窗外傳來，你不自覺地用手指敲了敲桌面。",
+        choices: []
+    },
+    // 第 45 段（3/6 幕）
     {
         chapter: 3,
         title: "被遺忘的回憶",
@@ -2309,7 +3288,40 @@ const storyScenes = [
         background: "childhood_memory_rain",
         character: "柳如煙",
         expression: "normal",
-        text: "那天晚上，你回到家後，腦海裡一直浮現小公園的老樹。你打開手機，重新看過這幾天拍下的照片：星圖、紙條、鐵盒，還有石椅底部的小星星。雨聲從窗外傳來，你不自覺地用手指敲了敲桌面。就在那一瞬間，一段陌生又熟悉的畫面突然湧入腦海。夢裡的你似乎年紀很小，正坐在老樹下，手裡拿著一張折好的紙。身旁的女孩低頭畫著星星，問你：「如果有一天我們忘記彼此了，怎麼辦？」年幼的你想了一會兒，回答：「那就把重要的事情留下來，總有一天，我們會找到答案。」畫面到這裡突然中斷。你睜開眼睛，發現自己仍坐在書桌前，卻已經想不起那個女孩的長相。你開始懷疑，那段記憶或許不只是夢。",
+        text: "就在那一瞬間，一段陌生又熟悉的畫面突然湧入腦海。夢裡的你似乎年紀很小，正坐在老樹下，手裡拿著一張折好的紙。",
+        choices: []
+    },
+    // 第 45 段（4/6 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "childhood_memory_rain",
+        character: "柳如煙",
+        expression: "normal",
+        text: "身旁的女孩低頭畫著星星，問你：「如果有一天我們忘記彼此了，怎麼辦？」",
+        choices: []
+    },
+    // 第 45 段（5/6 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "childhood_memory_rain",
+        character: "柳如煙",
+        expression: "normal",
+        text: "年幼的你想了一會兒，回答：「那就把重要的事情留下來，總有一天，我們會找到答案。」畫面到這裡突然中斷。",
+        choices: []
+    },
+    // 第 45 段（6/6 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "bedroom",
+        character: "柳如煙",
+        expression: "normal",
+        text: "你睜開眼睛，發現自己仍坐在書桌前，卻已經想不起那個女孩的長相。你開始懷疑，那段記憶或許不只是夢。",
         choices: [
             {
                 text: "立刻把夢境與之前的線索全部記錄下來",
@@ -2349,6 +3361,7 @@ const storyScenes = [
     // ==============================
     // 第 46 幕：相似的夢境
     // ==============================
+    // 第 46 段（1/4 幕）
     {
         chapter: 3,
         title: "被遺忘的回憶",
@@ -2356,7 +3369,40 @@ const storyScenes = [
         background: "classroom_sunset",
         character: "柳如煙",
         expression: "normal",
-        text: "隔天放學後，你請柳如煙留一下。教室裡只剩下夕陽照進窗邊的光影。你猶豫了一會兒，才告訴她昨晚想起的童年片段：老樹、雨聲、一張折好的紙，以及女孩問過的那句話。「如果有一天我們忘記彼此了，怎麼辦？」聽見這句話，柳如煙原本握著筆的手忽然停住。她沒有立刻回答，只是反覆確認你記得的內容。過了很久，她才低聲說：「我好像也聽過類似的話……可是，我不確定那是不是同一天發生的事。」她看著你，眼神裡既有期待，也有害怕認錯人的不安。",
+        text: "隔天放學後，你請柳如煙留一下。教室裡只剩下夕陽照進窗邊的光影。",
+        choices: []
+    },
+    // 第 46 段（2/4 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "柳如煙",
+        background: "classroom_sunset",
+        character: "柳如煙",
+        expression: "normal",
+        text: "你猶豫了一會兒，才告訴她昨晚想起的童年片段：老樹、雨聲、一張折好的紙，以及女孩問過的那句話。「如果有一天我們忘記彼此了，怎麼辦？」",
+        choices: []
+    },
+    // 第 46 段（3/4 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "柳如煙",
+        background: "classroom_sunset",
+        character: "柳如煙",
+        expression: "normal",
+        text: "聽見這句話，柳如煙原本握著筆的手忽然停住。她沒有立刻回答，只是反覆確認你記得的內容。",
+        choices: []
+    },
+    // 第 46 段（4/4 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "柳如煙",
+        background: "classroom_sunset",
+        character: "柳如煙",
+        expression: "normal",
+        text: "過了很久，她才低聲說：「我好像也聽過類似的話……可是，我不確定那是不是同一天發生的事。」她看著你，眼神裡既有期待，也有害怕認錯人的不安。",
         choices: [
             {
                 text: "把記下的夢境拿給她看，讓她慢慢確認",
@@ -2393,6 +3439,7 @@ const storyScenes = [
     // ==============================
     // 第 47 幕：名冊上的空白
     // ==============================
+    // 第 47 段（1/5 幕）
     {
         chapter: 3,
         title: "被遺忘的回憶",
@@ -2400,7 +3447,51 @@ const storyScenes = [
         background: "old_center_archive",
         character: "柳如煙",
         expression: "normal",
-        text: "隔天下午，你和柳如煙再次來到活動中心。老先生答應讓你們查閱保存下來的活動資料，但提醒你們，有些紀錄已經遺失或受損。你們先從星空活動舉辦的年份開始找，翻過幾本名冊後，終於找到一份參加者登記表。上面有許多孩子的名字，其中幾個字跡已經模糊。柳如煙一頁頁看過去，原本期待的神情逐漸變得緊張。直到最後一頁，她忽然停下來。那裡有兩個名字被墨水暈開，只能辨認出部分筆畫，旁邊還有一個小小的星星符號。她盯著那兩行字，低聲說：「如果能看清楚這兩個名字，也許就能知道當年到底是誰參加了活動。」",
+        text: "隔天下午，你和柳如煙再次來到活動中心。老先生答應讓你們查閱保存下來的活動資料，但提醒你們，有些紀錄已經遺失或受損。",
+        choices: []
+    },
+    // 第 47 段（2/5 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "old_center_archive",
+        character: "柳如煙",
+        expression: "normal",
+        text: "你們先從星空活動舉辦的年份開始找，翻過幾本名冊後，終於找到一份參加者登記表。上面有許多孩子的名字，其中幾個字跡已經模糊。",
+        choices: []
+    },
+    // 第 47 段（3/5 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "old_center_archive",
+        character: "柳如煙",
+        expression: "normal",
+        text: "柳如煙一頁頁看過去，原本期待的神情逐漸變得緊張。直到最後一頁，她忽然停下來。",
+        choices: []
+    },
+    // 第 47 段（4/5 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "old_center_archive",
+        character: "柳如煙",
+        expression: "normal",
+        text: "那裡有兩個名字被墨水暈開，只能辨認出部分筆畫，旁邊還有一個小小的星星符號。",
+        choices: []
+    },
+    // 第 47 段（5/5 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "old_center_archive",
+        character: "柳如煙",
+        expression: "normal",
+        text: "她盯著那兩行字，低聲說：「如果能看清楚這兩個名字，也許就能知道當年到底是誰參加了活動。」",
         choices: [
             {
                 text: "用之前記下的活動日期，核對最可能的名冊",
@@ -2437,6 +3528,7 @@ const storyScenes = [
     // ==============================
     // 第 48 幕：藍色記號的另一端
     // ==============================
+    // 第 48 段（1/5 幕）
     {
         chapter: 3,
         title: "被遺忘的回憶",
@@ -2444,7 +3536,51 @@ const storyScenes = [
         background: "old_center_archive",
         character: "柳如煙",
         expression: "surprised",
-        text: "老先生離開檔案室前，忽然想起一件事。他從另一個櫃子取出一本薄薄的活動紀錄簿，封面沒有標題，只有一道褪色的藍線。「這本不是正式名冊，是以前的工作人員用來記錄活動用品的。」他說。你和柳如煙翻開紀錄簿，發現裡面畫著星圖、紙袋和幾種奇怪的符號。翻到其中一頁時，柳如煙立刻停了下來。紙上的藍色記號，竟然和你們在儲藏室紙袋上看見的形狀十分相似。旁邊還寫著一行小字：『北方星列，第三顆；物品已交還參加者。』柳如煙抬起頭，眼神裡第一次出現了明確的期待。「所以那個紙袋可能不是隨便留下來的……它和當年的活動紀錄有關。」",
+        text: "老先生離開檔案室前，忽然想起一件事。他從另一個櫃子取出一本薄薄的活動紀錄簿，封面沒有標題，只有一道褪色的藍線。",
+        choices: []
+    },
+    // 第 48 段（2/5 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "old_center_archive",
+        character: "柳如煙",
+        expression: "surprised",
+        text: "「這本不是正式名冊，是以前的工作人員用來記錄活動用品的。」他說。你和柳如煙翻開紀錄簿，發現裡面畫著星圖、紙袋和幾種奇怪的符號。",
+        choices: []
+    },
+    // 第 48 段（3/5 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "old_center_archive",
+        character: "柳如煙",
+        expression: "surprised",
+        text: "翻到其中一頁時，柳如煙立刻停了下來。紙上的藍色記號，竟然和你們在儲藏室紙袋上看見的形狀十分相似。",
+        choices: []
+    },
+    // 第 48 段（4/5 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "old_center_archive",
+        character: "柳如煙",
+        expression: "surprised",
+        text: "旁邊還寫著一行小字：『北方星列，第三顆；物品已交還參加者。』柳如煙抬起頭，眼神裡第一次出現了明確的期待。",
+        choices: []
+    },
+    // 第 48 段（5/5 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "old_center_archive",
+        character: "柳如煙",
+        expression: "surprised",
+        text: "「所以那個紙袋可能不是隨便留下來的……它和當年的活動紀錄有關。」",
         choices: [
             {
                 text: "把紀錄簿的符號與紙袋記號仔細比對",
@@ -2485,6 +3621,7 @@ const storyScenes = [
     // ==============================
     // 第 49 幕：沒有寄出的信，留下的地址
     // ==============================
+    // 第 49 段（1/5 幕）
     {
         chapter: 3,
         title: "被遺忘的回憶",
@@ -2492,7 +3629,51 @@ const storyScenes = [
         background: "old_center_office",
         character: "老管理員",
         expression: "normal",
-        text: "你們把紀錄簿交給老先生，希望他能認出其中的日期與記號。老先生翻到最後幾頁，忽然指著一行幾乎被紙張折痕遮住的文字。「這個……我好像有印象。」那行字提到，一名年紀很小的參加者曾留下信件，原本打算在活動結束後交給另一名孩子，最後卻沒有完成交接。旁邊還寫著：「若本人未來領取，暫存於舊資料室。」柳如煙的手指停在那行字上。她沉默了很久，才緩緩開口：「我小時候……好像真的寫過一封信。可是，我一直想不起來信裡寫了什麼。」老先生表示，舊資料室後來整理過好幾次，信件是否還在，必須親自找過才能知道。",
+        text: "你們把紀錄簿交給老先生，希望他能認出其中的日期與記號。老先生翻到最後幾頁，忽然指著一行幾乎被紙張折痕遮住的文字。",
+        choices: []
+    },
+    // 第 49 段（2/5 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "old_center_office",
+        character: "老管理員",
+        expression: "normal",
+        text: "「這個……我好像有印象。」那行字提到，一名年紀很小的參加者曾留下信件，原本打算在活動結束後交給另一名孩子，最後卻沒有完成交接。",
+        choices: []
+    },
+    // 第 49 段（3/5 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "old_center_office",
+        character: "老管理員",
+        expression: "normal",
+        text: "旁邊還寫著：「若本人未來領取，暫存於舊資料室。」柳如煙的手指停在那行字上。",
+        choices: []
+    },
+    // 第 49 段（4/5 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "old_center_office",
+        character: "老管理員",
+        expression: "normal",
+        text: "她沉默了很久，才緩緩開口：「我小時候……好像真的寫過一封信。可是，我一直想不起來信裡寫了什麼。」",
+        choices: []
+    },
+    // 第 49 段（5/5 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "old_center_office",
+        character: "老管理員",
+        expression: "normal",
+        text: "老先生表示，舊資料室後來整理過好幾次，信件是否還在，必須親自找過才能知道。",
         choices: [
             {
                 text: "請老先生一起確認舊資料室的保存紀錄",
@@ -2529,6 +3710,7 @@ const storyScenes = [
     // ==============================
     // 第 50 幕：被改寫的編號
     // ==============================
+    // 第 50 段（1/6 幕）
     {
         chapter: 3,
         title: "被遺忘的回憶",
@@ -2536,7 +3718,62 @@ const storyScenes = [
         background: "old_center_archive",
         character: "柳如煙",
         expression: "normal",
-        text: "隔天，你們帶著舊移交清單回到資料室。老先生找來新的保存目錄，逐一核對過去的編號。原本標記為「未交付紙件一份」的項目，後來被移到了另一個分類，新的標籤只寫著「私人紀念物」。你們依照清單找到一只扁平的紙盒，盒面有一道褪色的藍線，角落則畫著一顆小星星。柳如煙沒有立刻伸手，而是先看向老先生，確認這只盒子可以由他們在場查看。盒蓋打開後，裡面放著幾張舊照片、活動紀錄，以及一個被折得整整齊齊的信封。信封沒有郵票，收件人一欄空白，背面卻畫著一顆有著特殊長角的星星。柳如煙怔怔地望著它，像是快要想起什麼，卻又被最後一層模糊的記憶擋住。",
+        text: "隔天，你們帶著舊移交清單回到資料室。老先生找來新的保存目錄，逐一核對過去的編號。",
+        choices: []
+    },
+    // 第 50 段（2/6 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "old_center_archive",
+        character: "柳如煙",
+        expression: "normal",
+        text: "原本標記為「未交付紙件一份」的項目，後來被移到了另一個分類，新的標籤只寫著「私人紀念物」。",
+        choices: []
+    },
+    // 第 50 段（3/6 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "old_center_archive",
+        character: "柳如煙",
+        expression: "normal",
+        text: "你們依照清單找到一只扁平的紙盒，盒面有一道褪色的藍線，角落則畫著一顆小星星。",
+        choices: []
+    },
+    // 第 50 段（4/6 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "old_center_archive",
+        character: "柳如煙",
+        expression: "normal",
+        text: "柳如煙沒有立刻伸手，而是先看向老先生，確認這只盒子可以由他們在場查看。",
+        choices: []
+    },
+    // 第 50 段（5/6 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "old_center_archive",
+        character: "柳如煙",
+        expression: "normal",
+        text: "盒蓋打開後，裡面放著幾張舊照片、活動紀錄，以及一個被折得整整齊齊的信封。信封沒有郵票，收件人一欄空白，背面卻畫著一顆有著特殊長角的星星。",
+        choices: []
+    },
+    // 第 50 段（6/6 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "old_center_archive",
+        character: "柳如煙",
+        expression: "normal",
+        text: "柳如煙怔怔地望著它，像是快要想起什麼，卻又被最後一層模糊的記憶擋住。",
         choices: [
             {
                 text: "先檢查信封背面的星星，與舊星圖比對",
@@ -2573,6 +3810,7 @@ const storyScenes = [
     // ==============================
     // 第 51 幕：沒有寄出的信
     // ==============================
+    // 第 51 段（1/5 幕）
     {
         chapter: 3,
         title: "被遺忘的回憶",
@@ -2580,7 +3818,51 @@ const storyScenes = [
         background: "old_center_archive",
         character: "柳如煙",
         expression: "sad",
-        text: "老先生確認保存紀錄後，柳如煙才小心地打開信封。裡面是一張泛黃的信紙，折痕已經很深，字跡卻仍然清楚。開頭沒有收件人的名字，只寫著：「如果有一天，我們真的走散了，希望你不要忘記那片星空。」柳如煙的手微微顫抖，繼續讀下去：「我們說好，長大以後要再回到第一次約定的地方，一起看北方的第三顆星。要是你忘記了，就看我畫的星星。那個角畫得比較長的，就是我留下的記號。」讀到這裡，她停了下來，眼眶泛紅。信紙的最後一段被水漬暈開，只剩下幾個模糊的字。她努力辨認，卻始終看不清楚。你看著那封信，心中浮現一種難以解釋的熟悉感，彷彿自己曾經也等待過這樣一封信。",
+        text: "老先生確認保存紀錄後，柳如煙才小心地打開信封。裡面是一張泛黃的信紙，折痕已經很深，字跡卻仍然清楚。",
+        choices: []
+    },
+    // 第 51 段（2/5 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "old_center_archive",
+        character: "柳如煙",
+        expression: "sad",
+        text: "開頭沒有收件人的名字，只寫著：「如果有一天，我們真的走散了，希望你不要忘記那片星空。」",
+        choices: []
+    },
+    // 第 51 段（3/5 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "old_center_archive",
+        character: "柳如煙",
+        expression: "sad",
+        text: "柳如煙的手微微顫抖，繼續讀下去：「我們說好，長大以後要再回到第一次約定的地方，一起看北方的第三顆星。要是你忘記了，就看我畫的星星。那個角畫得比較長的，就是我留下的記號。」",
+        choices: []
+    },
+    // 第 51 段（4/5 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "old_center_archive",
+        character: "柳如煙",
+        expression: "sad",
+        text: "讀到這裡，她停了下來，眼眶泛紅。信紙的最後一段被水漬暈開，只剩下幾個模糊的字。她努力辨認，卻始終看不清楚。",
+        choices: []
+    },
+    // 第 51 段（5/5 幕）
+    {
+        chapter: 3,
+        title: "被遺忘的回憶",
+        name: "旁白",
+        background: "old_center_archive",
+        character: "柳如煙",
+        expression: "sad",
+        text: "你看著那封信，心中浮現一種難以解釋的熟悉感，彷彿自己曾經也等待過這樣一封信。",
         choices: [
             {
                 text: "陪她逐字整理信件，保留每個能辨認的線索",
@@ -2618,6 +3900,7 @@ const storyScenes = [
     // ==============================
     // 第 52 幕：那個熟悉的筆跡
     // ==============================
+    // 第 52 段（1/5 幕）
     {
         chapter: 4,
         title: "那一天的真相",
@@ -2625,7 +3908,51 @@ const storyScenes = [
         background: "classroom_sunset",
         character: "柳如煙",
         expression: "thinking",
-        text: "離開活動中心後，你和柳如煙回到學校。她把信件的影本放在桌上，反覆看著其中幾個字。忽然，她指著「如果你忘記了，就看我畫的星星」這句話，說自己想起了一件事。小時候，她曾經把畫星星的方法教給一個男孩，還笑他每次都把其中一個角畫得特別長。你下意識地拿出自己的舊筆記本，翻到以前隨手畫過的一頁。那裡有一顆星星，其中一個角同樣比其他角長。柳如煙看見後，整個人愣住了。她沒有立刻說你就是那個男孩，只是將兩張圖並排放好，仔細比較線條。「這個畫法……真的很像。」她輕聲說。你也開始懷疑，自己反覆夢見的童年片段，或許並不只是夢。",
+        text: "離開活動中心後，你和柳如煙回到學校。她把信件的影本放在桌上，反覆看著其中幾個字。",
+        choices: []
+    },
+    // 第 52 段（2/5 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "classroom_sunset",
+        character: "柳如煙",
+        expression: "thinking",
+        text: "忽然，她指著「如果你忘記了，就看我畫的星星」這句話，說自己想起了一件事。",
+        choices: []
+    },
+    // 第 52 段（3/5 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "classroom_sunset",
+        character: "柳如煙",
+        expression: "thinking",
+        text: "小時候，她曾經把畫星星的方法教給一個男孩，還笑他每次都把其中一個角畫得特別長。你下意識地拿出自己的舊筆記本，翻到以前隨手畫過的一頁。",
+        choices: []
+    },
+    // 第 52 段（4/5 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "classroom_sunset",
+        character: "柳如煙",
+        expression: "thinking",
+        text: "那裡有一顆星星，其中一個角同樣比其他角長。柳如煙看見後，整個人愣住了。她沒有立刻說你就是那個男孩，只是將兩張圖並排放好，仔細比較線條。",
+        choices: []
+    },
+    // 第 52 段（5/5 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "classroom_sunset",
+        character: "柳如煙",
+        expression: "thinking",
+        text: "「這個畫法……真的很像。」她輕聲說。你也開始懷疑，自己反覆夢見的童年片段，或許並不只是夢。",
         choices: [
             {
                 text: "把筆記本交給她，讓她仔細比較兩種畫法",
@@ -2662,6 +3989,7 @@ const storyScenes = [
     // ==============================
     // 第 53 幕：樹下的最後一句話
     // ==============================
+    // 第 53 段（1/5 幕）
     {
         chapter: 4,
         title: "那一天的真相",
@@ -2669,7 +3997,51 @@ const storyScenes = [
         background: "old_neighborhood_park",
         character: "柳如煙",
         expression: "thinking",
-        text: "週末，你陪柳如煙回到那座老公園。老樹還在，只是枝葉比記憶中稀疏了許多。她站在樹下，閉上眼睛，試著回想當年和男孩分開前的情景。起初只有模糊的笑聲，接著是雨水落在地面的聲音，以及一雙沾著泥土的鞋。她忽然睜開眼睛，說自己想起了那天的一個細節：男孩離開之前，曾把一張折好的紙交給她，叮囑她不要急著打開，要等到自己真的找不到他時再看。可是她的記憶到這裡便中斷了。她不知道那張紙究竟是信件，還是另一張寫著約定的紙條。你看著老樹下的石椅，忽然覺得這個地方與夢境裡的景象重疊在一起。",
+        text: "週末，你陪柳如煙回到那座老公園。老樹還在，只是枝葉比記憶中稀疏了許多。她站在樹下，閉上眼睛，試著回想當年和男孩分開前的情景。",
+        choices: []
+    },
+    // 第 53 段（2/5 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "old_neighborhood_park",
+        character: "柳如煙",
+        expression: "thinking",
+        text: "起初只有模糊的笑聲，接著是雨水落在地面的聲音，以及一雙沾著泥土的鞋。",
+        choices: []
+    },
+    // 第 53 段（3/5 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "old_neighborhood_park",
+        character: "柳如煙",
+        expression: "thinking",
+        text: "她忽然睜開眼睛，說自己想起了那天的一個細節：男孩離開之前，曾把一張折好的紙交給她，叮囑她不要急著打開，要等到自己真的找不到他時再看。",
+        choices: []
+    },
+    // 第 53 段（4/5 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "old_neighborhood_park",
+        character: "柳如煙",
+        expression: "thinking",
+        text: "可是她的記憶到這裡便中斷了。她不知道那張紙究竟是信件，還是另一張寫著約定的紙條。",
+        choices: []
+    },
+    // 第 53 段（5/5 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "old_neighborhood_park",
+        character: "柳如煙",
+        expression: "thinking",
+        text: "你看著老樹下的石椅，忽然覺得這個地方與夢境裡的景象重疊在一起。",
         choices: [
             {
                 text: "陪她坐在石椅上，慢慢回想當天的情景",
@@ -2706,6 +4078,7 @@ const storyScenes = [
     // ==============================
     // 第 54 幕：被遮住的名字
     // ==============================
+    // 第 54 段（1/5 幕）
     {
         chapter: 4,
         title: "那一天的真相",
@@ -2713,7 +4086,51 @@ const storyScenes = [
         background: "old_center_archive",
         character: "柳如煙",
         expression: "surprised",
-        text: "你和柳如煙帶著石椅上的日期照片，再次回到活動中心。老先生翻出當年的活動紀錄，逐一核對後，終於找到相近的日期。那一天確實有一場觀星活動，結束後還有兩名孩子留在公園附近。紀錄旁邊畫著一顆小星星，與你們找到的信封圖案十分相似。然而，登記表上的其中一個名字被水漬完全遮住，另一個名字也只剩下幾個難以辨認的筆畫。老先生說，當年有些資料曾被重新抄寫，原件可能還保存在另一個地方。柳如煙看著那片空白，沒有像以前那樣急著猜測。她輕聲說：「我們已經知道那一天真的發生過，也找到留下來的約定。現在只差能確認身分的證據。」",
+        text: "你和柳如煙帶著石椅上的日期照片，再次回到活動中心。老先生翻出當年的活動紀錄，逐一核對後，終於找到相近的日期。",
+        choices: []
+    },
+    // 第 54 段（2/5 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "old_center_archive",
+        character: "柳如煙",
+        expression: "surprised",
+        text: "那一天確實有一場觀星活動，結束後還有兩名孩子留在公園附近。紀錄旁邊畫著一顆小星星，與你們找到的信封圖案十分相似。",
+        choices: []
+    },
+    // 第 54 段（3/5 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "old_center_archive",
+        character: "柳如煙",
+        expression: "surprised",
+        text: "然而，登記表上的其中一個名字被水漬完全遮住，另一個名字也只剩下幾個難以辨認的筆畫。",
+        choices: []
+    },
+    // 第 54 段（4/5 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "old_center_archive",
+        character: "柳如煙",
+        expression: "surprised",
+        text: "老先生說，當年有些資料曾被重新抄寫，原件可能還保存在另一個地方。柳如煙看著那片空白，沒有像以前那樣急著猜測。",
+        choices: []
+    },
+    // 第 54 段（5/5 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "old_center_archive",
+        character: "柳如煙",
+        expression: "surprised",
+        text: "她輕聲說：「我們已經知道那一天真的發生過，也找到留下來的約定。現在只差能確認身分的證據。」",
         choices: [
             {
                 text: "請老先生尋找當年的原始登記表",
@@ -2750,6 +4167,7 @@ const storyScenes = [
     // ==============================
     // 第 55 幕：移交紀錄的最後一站
     // ==============================
+    // 第 55 段（1/5 幕）
     {
         chapter: 4,
         title: "那一天的真相",
@@ -2757,7 +4175,51 @@ const storyScenes = [
         background: "old_center_office",
         character: "老管理員",
         expression: "normal",
-        text: "幾天後，老先生終於查到一筆較完整的移交紀錄。當年的部分活動資料，在整理時被送往附近的地方文史資料室保存，其中就包含原始參加者名冊。你和柳如煙立刻記下地址，準備前往查詢。出發前，老先生又拿出一張舊工作便條。便條上寫著：「若有人回來尋找那一天，請先確認他是否知道星空的約定。」柳如煙看著這句話，神情變得複雜。她說，這不像一般的資料整理備註，更像是有人特別留下來的一句提醒。你讀著那行字，腦海裡忽然閃過夢境中男孩的聲音，彷彿他曾經說過相似的話。可是，你仍然無法確定那段記憶究竟從何而來。",
+        text: "幾天後，老先生終於查到一筆較完整的移交紀錄。當年的部分活動資料，在整理時被送往附近的地方文史資料室保存，其中就包含原始參加者名冊。",
+        choices: []
+    },
+    // 第 55 段（2/5 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "old_center_office",
+        character: "老管理員",
+        expression: "normal",
+        text: "你和柳如煙立刻記下地址，準備前往查詢。出發前，老先生又拿出一張舊工作便條。",
+        choices: []
+    },
+    // 第 55 段（3/5 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "old_center_office",
+        character: "老管理員",
+        expression: "normal",
+        text: "便條上寫著：「若有人回來尋找那一天，請先確認他是否知道星空的約定。」柳如煙看著這句話，神情變得複雜。",
+        choices: []
+    },
+    // 第 55 段（4/5 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "old_center_office",
+        character: "老管理員",
+        expression: "normal",
+        text: "她說，這不像一般的資料整理備註，更像是有人特別留下來的一句提醒。你讀著那行字，腦海裡忽然閃過夢境中男孩的聲音，彷彿他曾經說過相似的話。",
+        choices: []
+    },
+    // 第 55 段（5/5 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "old_center_office",
+        character: "老管理員",
+        expression: "normal",
+        text: "可是，你仍然無法確定那段記憶究竟從何而來。",
         choices: [
             {
                 text: "詢問老先生，這張便條是誰留下的",
@@ -2794,6 +4256,7 @@ const storyScenes = [
     // ==============================
     // 第 56 幕：原始名冊上的名字
     // ==============================
+    // 第 56 段（1/6 幕）
     {
         chapter: 4,
         title: "那一天的真相",
@@ -2801,7 +4264,62 @@ const storyScenes = [
         background: "local_history_archive",
         character: "柳如煙",
         expression: "surprised",
-        text: "地方文史資料室比你想像中安靜，架上放滿了泛黃的文件與舊照片。工作人員依照你們提供的日期和移交編號，找出一冊保存完整度較高的原始名冊。柳如煙翻到星空活動那一頁，終於看見當年參加者的完整登記欄。那一天確實有兩名孩子在活動結束後留下，其中一人的名字旁畫著一顆星星，另一人則在備註欄留下了幾個字：「約定之地，日後再見。」然而，名字旁邊的紙張曾經被撕去一小角，最後一個字仍然看不清楚。你盯著那行字，心中湧起一股難以言喻的熟悉感。柳如煙沒有急著下結論，只把名冊上的內容逐字抄錄下來。她說：「我們終於找到原始紀錄了。只要再找到能補上缺角的資料，也許就能確認那個男孩是誰。」",
+        text: "地方文史資料室比你想像中安靜，架上放滿了泛黃的文件與舊照片。工作人員依照你們提供的日期和移交編號，找出一冊保存完整度較高的原始名冊。",
+        choices: []
+    },
+    // 第 56 段（2/6 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "local_history_archive",
+        character: "柳如煙",
+        expression: "surprised",
+        text: "柳如煙翻到星空活動那一頁，終於看見當年參加者的完整登記欄。",
+        choices: []
+    },
+    // 第 56 段（3/6 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "local_history_archive",
+        character: "柳如煙",
+        expression: "surprised",
+        text: "那一天確實有兩名孩子在活動結束後留下，其中一人的名字旁畫著一顆星星，另一人則在備註欄留下了幾個字：「約定之地，日後再見。」",
+        choices: []
+    },
+    // 第 56 段（4/6 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "local_history_archive",
+        character: "柳如煙",
+        expression: "surprised",
+        text: "然而，名字旁邊的紙張曾經被撕去一小角，最後一個字仍然看不清楚。你盯著那行字，心中湧起一股難以言喻的熟悉感。",
+        choices: []
+    },
+    // 第 56 段（5/6 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "local_history_archive",
+        character: "柳如煙",
+        expression: "surprised",
+        text: "柳如煙沒有急著下結論，只把名冊上的內容逐字抄錄下來。",
+        choices: []
+    },
+    // 第 56 段（6/6 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "local_history_archive",
+        character: "柳如煙",
+        expression: "surprised",
+        text: "她說：「我們終於找到原始紀錄了。只要再找到能補上缺角的資料，也許就能確認那個男孩是誰。」",
         choices: [
             {
                 text: "核對名冊的備註，找出與童年約定相符的內容",
@@ -2838,6 +4356,7 @@ const storyScenes = [
     // ==============================
     // 第 57 幕：照片裡的第二個人
     // ==============================
+    // 第 57 段（1/5 幕）
     {
         chapter: 4,
         title: "那一天的真相",
@@ -2845,7 +4364,51 @@ const storyScenes = [
         background: "local_history_archive",
         character: "柳如煙",
         expression: "surprised",
-        text: "工作人員帶你們到另一排資料櫃，找出當年星空活動的照片集。照片裡有許多孩子站在觀測台旁，有人拿著星圖，有人正對著鏡頭笑。翻到最後幾張時，你們看見兩個孩子站在老樹下，其中一個女孩手裡拿著一張折好的紙，另一個男孩則低頭看著她畫的星星。照片背面寫著活動日期，旁邊還有一行小字：「兩位參加者，活動結束後自行離開。」柳如煙望著照片，呼吸變得急促。女孩的身形和她記憶中的自己十分相似，而男孩的臉卻被照片上的一道刮痕遮住。你盯著男孩的手，忽然注意到他正在無意識地輕敲手指。那個動作，竟然和你思考時的習慣一模一樣。",
+        text: "工作人員帶你們到另一排資料櫃，找出當年星空活動的照片集。照片裡有許多孩子站在觀測台旁，有人拿著星圖，有人正對著鏡頭笑。",
+        choices: []
+    },
+    // 第 57 段（2/5 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "local_history_archive",
+        character: "柳如煙",
+        expression: "surprised",
+        text: "翻到最後幾張時，你們看見兩個孩子站在老樹下，其中一個女孩手裡拿著一張折好的紙，另一個男孩則低頭看著她畫的星星。",
+        choices: []
+    },
+    // 第 57 段（3/5 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "local_history_archive",
+        character: "柳如煙",
+        expression: "surprised",
+        text: "照片背面寫著活動日期，旁邊還有一行小字：「兩位參加者，活動結束後自行離開。」柳如煙望著照片，呼吸變得急促。",
+        choices: []
+    },
+    // 第 57 段（4/5 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "local_history_archive",
+        character: "柳如煙",
+        expression: "surprised",
+        text: "女孩的身形和她記憶中的自己十分相似，而男孩的臉卻被照片上的一道刮痕遮住。你盯著男孩的手，忽然注意到他正在無意識地輕敲手指。",
+        choices: []
+    },
+    // 第 57 段（5/5 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "local_history_archive",
+        character: "柳如煙",
+        expression: "surprised",
+        text: "那個動作，竟然和你思考時的習慣一模一樣。",
         choices: [
             {
                 text: "把男孩的手部動作與自己的習慣仔細比較",
@@ -2882,6 +4445,7 @@ const storyScenes = [
     // ==============================
     // 第 58 幕：被折起來的另一半
     // ==============================
+    // 第 58 段（1/6 幕）
     {
         chapter: 4,
         title: "那一天的真相",
@@ -2889,7 +4453,62 @@ const storyScenes = [
         background: "local_history_archive",
         character: "柳如煙",
         expression: "thinking",
-        text: "你們向工作人員詢問照片中那張折紙的下落。對方查閱了活動物品的保存紀錄，找到一份當年拍攝的物品清單。清單裡記載，活動結束後曾留下兩份紙件：一封未寄出的信，以及一張寫著觀星約定的折紙。信件後來被放進私人紀念物的紙盒，而折紙則被記錄為「交由參加者自行保管」。柳如煙看著這段文字，忽然想起自己小時候確實把一張紙收得很仔細，卻不記得後來放在了哪裡。你們繼續查看清單，發現折紙上曾寫著一句話：「如果忘記了，就從第一顆星開始找。」柳如煙低聲重複這句話，彷彿那是一段已經遺失很久、卻一直留在心底的聲音。",
+        text: "你們向工作人員詢問照片中那張折紙的下落。對方查閱了活動物品的保存紀錄，找到一份當年拍攝的物品清單。",
+        choices: []
+    },
+    // 第 58 段（2/6 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "local_history_archive",
+        character: "柳如煙",
+        expression: "thinking",
+        text: "清單裡記載，活動結束後曾留下兩份紙件：一封未寄出的信，以及一張寫著觀星約定的折紙。",
+        choices: []
+    },
+    // 第 58 段（3/6 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "local_history_archive",
+        character: "柳如煙",
+        expression: "thinking",
+        text: "信件後來被放進私人紀念物的紙盒，而折紙則被記錄為「交由參加者自行保管」。",
+        choices: []
+    },
+    // 第 58 段（4/6 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "local_history_archive",
+        character: "柳如煙",
+        expression: "thinking",
+        text: "柳如煙看著這段文字，忽然想起自己小時候確實把一張紙收得很仔細，卻不記得後來放在了哪裡。",
+        choices: []
+    },
+    // 第 58 段（5/6 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "local_history_archive",
+        character: "柳如煙",
+        expression: "thinking",
+        text: "你們繼續查看清單，發現折紙上曾寫著一句話：「如果忘記了，就從第一顆星開始找。」",
+        choices: []
+    },
+    // 第 58 段（6/6 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "local_history_archive",
+        character: "柳如煙",
+        expression: "thinking",
+        text: "柳如煙低聲重複這句話，彷彿那是一段已經遺失很久、卻一直留在心底的聲音。",
         choices: [
             {
                 text: "把折紙上的句子與信件內容逐字比對",
@@ -2926,6 +4545,7 @@ const storyScenes = [
     // ==============================
     // 第 59 幕：抽屜深處的折紙
     // ==============================
+    // 第 59 段（1/5 幕）
     {
         chapter: 4,
         title: "那一天的真相",
@@ -2933,7 +4553,51 @@ const storyScenes = [
         background: "ruyan_childhood_room",
         character: "柳如煙",
         expression: "surprised",
-        text: "週末，柳如煙傳訊息告訴你，她在家裡找到了一個很久沒打開的木製抽屜。裡面放著童年的照片、褪色的貼紙，以及幾張被折得整整齊齊的紙。她邀請你一起確認，因為她擔心自己會把記憶和想像混在一起。你來到她家後，她將其中一張紙慢慢攤開。紙上畫著一片簡單的星空，北方的星列旁有一道藍色記號，角落還寫著：「如果忘記了，就從第一顆星開始找。」這正是你們在活動紀錄中讀到的句子。紙張背面有一行稚嫩的字：「給長大以後的我們。」柳如煙看著那行字，眼神逐漸濕潤。她說，這張紙一直被自己留著，卻因為搬家而被遺忘在抽屜深處。她終於明白，自己並沒有完全失去那段回憶，只是忘了該從哪裡開始尋找。",
+        text: "週末，柳如煙傳訊息告訴你，她在家裡找到了一個很久沒打開的木製抽屜。裡面放著童年的照片、褪色的貼紙，以及幾張被折得整整齊齊的紙。",
+        choices: []
+    },
+    // 第 59 段（2/5 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "ruyan_childhood_room",
+        character: "柳如煙",
+        expression: "surprised",
+        text: "她邀請你一起確認，因為她擔心自己會把記憶和想像混在一起。你來到她家後，她將其中一張紙慢慢攤開。",
+        choices: []
+    },
+    // 第 59 段（3/5 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "ruyan_childhood_room",
+        character: "柳如煙",
+        expression: "surprised",
+        text: "紙上畫著一片簡單的星空，北方的星列旁有一道藍色記號，角落還寫著：「如果忘記了，就從第一顆星開始找。」這正是你們在活動紀錄中讀到的句子。",
+        choices: []
+    },
+    // 第 59 段（4/5 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "ruyan_childhood_room",
+        character: "柳如煙",
+        expression: "surprised",
+        text: "紙張背面有一行稚嫩的字：「給長大以後的我們。」柳如煙看著那行字，眼神逐漸濕潤。她說，這張紙一直被自己留著，卻因為搬家而被遺忘在抽屜深處。",
+        choices: []
+    },
+    // 第 59 段（5/5 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "ruyan_childhood_room",
+        character: "柳如煙",
+        expression: "surprised",
+        text: "她終於明白，自己並沒有完全失去那段回憶，只是忘了該從哪裡開始尋找。",
         choices: [
             {
                 text: "把折紙與信件的內容放在一起，重新整理約定",
@@ -2970,6 +4634,7 @@ const storyScenes = [
     // ==============================
     // 第 60 幕：夢境裡的最後一塊拼圖
     // ==============================
+    // 第 60 段（1/5 幕）
     {
         chapter: 4,
         title: "那一天的真相",
@@ -2977,7 +4642,51 @@ const storyScenes = [
         background: "childhood_memory_rain",
         character: "柳如煙",
         expression: "thinking",
-        text: "那天晚上，你又夢見了老樹與星空。這一次，夢境比以前清楚得多。年幼的男孩坐在石椅上，一邊聽著雨聲，一邊用手指輕敲膝蓋。女孩把畫好的星星遞給他，笑著說：「你每次想事情都會這樣敲手指，真的改不掉。」男孩不好意思地停下動作，接著拿出一張折紙，說要把兩人的約定留下來。女孩問他：「如果長大以後，我們真的認不出彼此呢？」男孩沉默片刻，才回答：「那就不要只看臉。記住我們說過的話，還有一起留下的東西。」就在女孩準備說出下一句話時，夢境突然中斷。你醒來後，發現自己不自覺地敲著手指，心裡第一次浮現一個清晰的念頭：那個男孩可能就是自己。",
+        text: "那天晚上，你又夢見了老樹與星空。這一次，夢境比以前清楚得多。年幼的男孩坐在石椅上，一邊聽著雨聲，一邊用手指輕敲膝蓋。",
+        choices: []
+    },
+    // 第 60 段（2/5 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "childhood_memory_rain",
+        character: "柳如煙",
+        expression: "thinking",
+        text: "女孩把畫好的星星遞給他，笑著說：「你每次想事情都會這樣敲手指，真的改不掉。」",
+        choices: []
+    },
+    // 第 60 段（3/5 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "childhood_memory_rain",
+        character: "柳如煙",
+        expression: "thinking",
+        text: "男孩不好意思地停下動作，接著拿出一張折紙，說要把兩人的約定留下來。女孩問他：「如果長大以後，我們真的認不出彼此呢？」",
+        choices: []
+    },
+    // 第 60 段（4/5 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "childhood_memory_rain",
+        character: "柳如煙",
+        expression: "thinking",
+        text: "男孩沉默片刻，才回答：「那就不要只看臉。記住我們說過的話，還有一起留下的東西。」就在女孩準備說出下一句話時，夢境突然中斷。",
+        choices: []
+    },
+    // 第 60 段（5/5 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "bedroom",
+        character: "柳如煙",
+        expression: "thinking",
+        text: "你醒來後，發現自己不自覺地敲著手指，心裡第一次浮現一個清晰的念頭：那個男孩可能就是自己。",
         choices: [
             {
                 text: "把夢裡的每個細節寫下來，再與舊紀錄比對",
@@ -3014,6 +4723,7 @@ const storyScenes = [
     // ==============================
     // 第 61 幕：所有線索的交會點
     // ==============================
+    // 第 61 段（1/5 幕）
     {
         chapter: 4,
         title: "那一天的真相",
@@ -3021,7 +4731,51 @@ const storyScenes = [
         background: "school_library_evening",
         character: "柳如煙",
         expression: "thinking",
-        text: "放學後，你和柳如煙借了圖書館的一張桌子，把一路找到的資料全部攤開：舊照片、活動名冊、保存紀錄、信件抄本、折紙，以及星圖的照片。你們先確認活動日期，再核對星星符號與藍色記號，接著將信件和折紙中的句子逐字比對。原本看似毫無關聯的細節，開始慢慢連成一條清楚的線。第一顆星用來辨認方向，北方第三顆星才是兩人約定要一起觀看的目標；特殊的長角星星則是女孩留下的記號。柳如煙望著桌面，終於說：「我以前一直以為，只要想起他的臉，就能找到他。可是我們真正找到的，是他留下來的每一件事情。」她抬頭看向你，目光停留了片刻。「現在，我想知道的不是你像不像他，而是你還記不記得，那一天最後發生了什麼。」",
+        text: "放學後，你和柳如煙借了圖書館的一張桌子，把一路找到的資料全部攤開：舊照片、活動名冊、保存紀錄、信件抄本、折紙，以及星圖的照片。",
+        choices: []
+    },
+    // 第 61 段（2/5 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "school_library_evening",
+        character: "柳如煙",
+        expression: "thinking",
+        text: "你們先確認活動日期，再核對星星符號與藍色記號，接著將信件和折紙中的句子逐字比對。原本看似毫無關聯的細節，開始慢慢連成一條清楚的線。",
+        choices: []
+    },
+    // 第 61 段（3/5 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "school_library_evening",
+        character: "柳如煙",
+        expression: "thinking",
+        text: "第一顆星用來辨認方向，北方第三顆星才是兩人約定要一起觀看的目標；特殊的長角星星則是女孩留下的記號。",
+        choices: []
+    },
+    // 第 61 段（4/5 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "school_library_evening",
+        character: "柳如煙",
+        expression: "thinking",
+        text: "柳如煙望著桌面，終於說：「我以前一直以為，只要想起他的臉，就能找到他。可是我們真正找到的，是他留下來的每一件事情。」",
+        choices: []
+    },
+    // 第 61 段（5/5 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "school_library_evening",
+        character: "柳如煙",
+        expression: "thinking",
+        text: "她抬頭看向你，目光停留了片刻。「現在，我想知道的不是你像不像他，而是你還記不記得，那一天最後發生了什麼。」",
         choices: [
             {
                 text: "依照日期、星圖與紙件順序，重新整理整段約定",
@@ -3063,6 +4817,7 @@ const storyScenes = [
     // ==============================
     // 第 62 幕：被遺漏的最後一頁
     // ==============================
+    // 第 62 段（1/6 幕）
     {
         chapter: 4,
         title: "那一天的真相",
@@ -3070,7 +4825,62 @@ const storyScenes = [
         background: "local_history_archive",
         character: "柳如煙",
         expression: "surprised",
-        text: "隔天，你和柳如煙再次來到文史資料室。工作人員告訴你們，原始名冊最後還有一頁當年沒有完成數位化，因此先前的資料一直缺少這部分。你們在工作人員陪同下找到那一頁，紙張邊緣雖然破損，卻保留著兩名孩子的登記資料。其中一欄寫著活動結束後的聯絡方式，另一欄則記錄了物品交還的情況。柳如煙仔細看著那頁資料，發現其中一名孩子的備註，與信件裡的約定內容完全相符；另一名孩子的備註，則寫著「已將星圖交給對方保管」。然而，姓名欄仍有一部分被污漬遮住。工作人員說，資料室還保存著當年活動的報名卡，或許能補上名冊缺失的字。柳如煙握緊筆記本，低聲說：「我們真的快找到答案了。」",
+        text: "隔天，你和柳如煙再次來到文史資料室。工作人員告訴你們，原始名冊最後還有一頁當年沒有完成數位化，因此先前的資料一直缺少這部分。",
+        choices: []
+    },
+    // 第 62 段（2/6 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "local_history_archive",
+        character: "柳如煙",
+        expression: "surprised",
+        text: "你們在工作人員陪同下找到那一頁，紙張邊緣雖然破損，卻保留著兩名孩子的登記資料。",
+        choices: []
+    },
+    // 第 62 段（3/6 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "local_history_archive",
+        character: "柳如煙",
+        expression: "surprised",
+        text: "其中一欄寫著活動結束後的聯絡方式，另一欄則記錄了物品交還的情況。",
+        choices: []
+    },
+    // 第 62 段（4/6 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "local_history_archive",
+        character: "柳如煙",
+        expression: "surprised",
+        text: "柳如煙仔細看著那頁資料，發現其中一名孩子的備註，與信件裡的約定內容完全相符；另一名孩子的備註，則寫著「已將星圖交給對方保管」。",
+        choices: []
+    },
+    // 第 62 段（5/6 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "local_history_archive",
+        character: "柳如煙",
+        expression: "surprised",
+        text: "然而，姓名欄仍有一部分被污漬遮住。工作人員說，資料室還保存著當年活動的報名卡，或許能補上名冊缺失的字。",
+        choices: []
+    },
+    // 第 62 段（6/6 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "local_history_archive",
+        character: "柳如煙",
+        expression: "surprised",
+        text: "柳如煙握緊筆記本，低聲說：「我們真的快找到答案了。」",
         choices: [
             {
                 text: "核對物品交還紀錄，確認星圖曾交給誰",
@@ -3107,6 +4917,7 @@ const storyScenes = [
     // ==============================
     // 第 63 幕：逐漸清晰的名字
     // ==============================
+    // 第 63 段（1/6 幕）
     {
         chapter: 4,
         title: "那一天的真相",
@@ -3114,7 +4925,62 @@ const storyScenes = [
         background: "local_history_archive",
         character: "柳如煙",
         expression: "nervous",
-        text: "工作人員將兩張報名卡放在桌上，先確認日期、活動編號與保存紀錄。三項資料全部吻合後，你們才小心地翻到正面。第一張卡片上的姓名已經模糊，只能辨認出部分筆畫；第二張卡片的姓名則保存得比較完整，但旁邊沒有星星記號。柳如煙看著那張畫著特殊星星的卡片，忽然皺起眉頭。「這個記號……我好像看過很多次。」她從筆記本裡拿出信件的照片，再翻出折紙與鐵盒裡的紙條照片。三個記號的長角方向一致，連旁邊的小缺口也幾乎相同。你們終於能確定，這些物品與那次活動有關。但工作人員提醒你們，星星只能證明物品之間的關聯，不能單靠圖案判定是誰畫的。柳如煙點點頭，將報名卡上的姓名抄下來，卻沒有馬上告訴你。她看著你，像是在等你自己想起什麼。",
+        text: "工作人員將兩張報名卡放在桌上，先確認日期、活動編號與保存紀錄。三項資料全部吻合後，你們才小心地翻到正面。",
+        choices: []
+    },
+    // 第 63 段（2/6 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "local_history_archive",
+        character: "柳如煙",
+        expression: "nervous",
+        text: "第一張卡片上的姓名已經模糊，只能辨認出部分筆畫；第二張卡片的姓名則保存得比較完整，但旁邊沒有星星記號。",
+        choices: []
+    },
+    // 第 63 段（3/6 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "local_history_archive",
+        character: "柳如煙",
+        expression: "nervous",
+        text: "柳如煙看著那張畫著特殊星星的卡片，忽然皺起眉頭。「這個記號……我好像看過很多次。」",
+        choices: []
+    },
+    // 第 63 段（4/6 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "local_history_archive",
+        character: "柳如煙",
+        expression: "nervous",
+        text: "她從筆記本裡拿出信件的照片，再翻出折紙與鐵盒裡的紙條照片。三個記號的長角方向一致，連旁邊的小缺口也幾乎相同。",
+        choices: []
+    },
+    // 第 63 段（5/6 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "local_history_archive",
+        character: "柳如煙",
+        expression: "nervous",
+        text: "你們終於能確定，這些物品與那次活動有關。但工作人員提醒你們，星星只能證明物品之間的關聯，不能單靠圖案判定是誰畫的。",
+        choices: []
+    },
+    // 第 63 段（6/6 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "local_history_archive",
+        character: "柳如煙",
+        expression: "nervous",
+        text: "柳如煙點點頭，將報名卡上的姓名抄下來，卻沒有馬上告訴你。她看著你，像是在等你自己想起什麼。",
         choices: [
             {
                 text: "先比對報名卡、信件與折紙上的日期",
@@ -3154,6 +5020,7 @@ const storyScenes = [
     // ==============================
     // 第 64 幕：最初的約定
     // ==============================
+    // 第 64 段（1/4 幕）
     {
         chapter: 4,
         title: "最初的約定",
@@ -3161,7 +5028,40 @@ const storyScenes = [
         background: "old_neighborhood_park",
         character: "柳如煙",
         expression: "sad",
-        text: "傍晚，你和柳如煙再次來到那棵老樹下。風吹過樹葉，發出熟悉的沙沙聲。柳如煙站在長椅旁，忽然伸手摸向椅背下方，像是想確認什麼。她愣了一下，接著蹲下身，從木板的縫隙裡取出一張早已泛黃的小卡片。卡片上畫著一顆星星，其中一個角特別長。她看了很久，眼眶漸漸泛紅。「我想起來了……那天分開以前，我把這張卡片交給了他。」她抬起頭看著你。「我跟他說，就算以後忘記了彼此，只要還記得這顆星星，就一定能找到回來的路。」你看著那熟悉的圖案，心底深處彷彿有什麼即將甦醒。",
+        text: "傍晚，你和柳如煙再次來到那棵老樹下。風吹過樹葉，發出熟悉的沙沙聲。柳如煙站在長椅旁，忽然伸手摸向椅背下方，像是想確認什麼。",
+        choices: []
+    },
+    // 第 64 段（2/4 幕）
+    {
+        chapter: 4,
+        title: "最初的約定",
+        name: "旁白",
+        background: "old_neighborhood_park",
+        character: "柳如煙",
+        expression: "sad",
+        text: "她愣了一下，接著蹲下身，從木板的縫隙裡取出一張早已泛黃的小卡片。卡片上畫著一顆星星，其中一個角特別長。她看了很久，眼眶漸漸泛紅。",
+        choices: []
+    },
+    // 第 64 段（3/4 幕）
+    {
+        chapter: 4,
+        title: "最初的約定",
+        name: "旁白",
+        background: "old_neighborhood_park",
+        character: "柳如煙",
+        expression: "sad",
+        text: "「我想起來了……那天分開以前，我把這張卡片交給了他。」她抬起頭看著你。",
+        choices: []
+    },
+    // 第 64 段（4/4 幕）
+    {
+        chapter: 4,
+        title: "最初的約定",
+        name: "旁白",
+        background: "old_neighborhood_park",
+        character: "柳如煙",
+        expression: "sad",
+        text: "「我跟他說，就算以後忘記了彼此，只要還記得這顆星星，就一定能找到回來的路。」你看著那熟悉的圖案，心底深處彷彿有什麼即將甦醒。",
         choices: [
             {
                 text: "告訴她，自己也一直記得這顆星星",
@@ -3191,6 +5091,7 @@ const storyScenes = [
     // ==============================
     // 第 65 幕：你是不是那個人
     // ==============================
+    // 第 65 段（1/5 幕）
     {
         chapter: 4,
         title: "你是不是那個人",
@@ -3198,7 +5099,51 @@ const storyScenes = [
         background: "old_neighborhood_park",
         character: "柳如煙",
         expression: "sad",
-        text: "柳如煙低頭看著手中的卡片，沉默了很久。忽然，她伸出手，輕輕敲了敲長椅，節奏和你思考時不自覺敲擊手指的習慣一模一樣。「我以前認識的那個男孩，也總是這樣。」她抬起頭，眼裡帶著期待，卻又害怕失望。「他喜歡下雨天，想事情的時候會敲手指，畫星星時還會把其中一個角畫得特別長……這些事情，你全都一樣。」她深吸一口氣。「我一直想找到他，可是我也害怕，真正找到的那一天，他已經不記得我了。」你看著她，終於明白，這些日子以來你們尋找的答案，或許一直就在彼此身邊。",
+        text: "柳如煙低頭看著手中的卡片，沉默了很久。忽然，她伸出手，輕輕敲了敲長椅，節奏和你思考時不自覺敲擊手指的習慣一模一樣。",
+        choices: []
+    },
+    // 第 65 段（2/5 幕）
+    {
+        chapter: 4,
+        title: "你是不是那個人",
+        name: "旁白",
+        background: "old_neighborhood_park",
+        character: "柳如煙",
+        expression: "sad",
+        text: "「我以前認識的那個男孩，也總是這樣。」她抬起頭，眼裡帶著期待，卻又害怕失望。",
+        choices: []
+    },
+    // 第 65 段（3/5 幕）
+    {
+        chapter: 4,
+        title: "你是不是那個人",
+        name: "旁白",
+        background: "old_neighborhood_park",
+        character: "柳如煙",
+        expression: "sad",
+        text: "「他喜歡下雨天，想事情的時候會敲手指，畫星星時還會把其中一個角畫得特別長……這些事情，你全都一樣。」她深吸一口氣。",
+        choices: []
+    },
+    // 第 65 段（4/5 幕）
+    {
+        chapter: 4,
+        title: "你是不是那個人",
+        name: "旁白",
+        background: "old_neighborhood_park",
+        character: "柳如煙",
+        expression: "sad",
+        text: "「我一直想找到他，可是我也害怕，真正找到的那一天，他已經不記得我了。」",
+        choices: []
+    },
+    // 第 65 段（5/5 幕）
+    {
+        chapter: 4,
+        title: "你是不是那個人",
+        name: "旁白",
+        background: "old_neighborhood_park",
+        character: "柳如煙",
+        expression: "sad",
+        text: "你看著她，終於明白，這些日子以來你們尋找的答案，或許一直就在彼此身邊。",
         choices: [
             {
                 text: "告訴她，自己也想起了那個約定",
@@ -3235,6 +5180,7 @@ const storyScenes = [
     // ==============================
     // 第 66 幕：那一天的真相
     // ==============================
+    // 第 66 段（1/5 幕）
     {
         chapter: 4,
         title: "那一天的真相",
@@ -3242,7 +5188,51 @@ const storyScenes = [
         background: "old_neighborhood_park_night",
         character: "柳如煙",
         expression: "sad",
-        text: "夜幕降臨，你和柳如煙坐在老樹下。她終於想起了分別那天的全部情景。當時，她的家人突然決定搬離這座城市，她甚至來不及好好道別。男孩把一封信交給她，答應等兩人長大後，一定會再回到這裡，一起看北方的第三顆星。可是那封信在搬家的途中遺失了。多年來，她只能靠著零碎的記憶尋找那個男孩，甚至漸漸忘記了他的長相。她轉頭看著你，輕聲說：「我以前一直以為，只要找到那張照片，就能找回所有記憶。現在我才明白，我真正想找回的，是那個曾經答應陪我看星星的人。」你望著夜空，童年的約定終於不再只是夢境。至於你們能否重新走在一起，答案將由此刻的你決定。",
+        text: "夜幕降臨，你和柳如煙坐在老樹下。她終於想起了分別那天的全部情景。當時，她的家人突然決定搬離這座城市，她甚至來不及好好道別。",
+        choices: []
+    },
+    // 第 66 段（2/5 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "old_neighborhood_park_night",
+        character: "柳如煙",
+        expression: "sad",
+        text: "男孩把一封信交給她，答應等兩人長大後，一定會再回到這裡，一起看北方的第三顆星。可是那封信在搬家的途中遺失了。",
+        choices: []
+    },
+    // 第 66 段（3/5 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "old_neighborhood_park_night",
+        character: "柳如煙",
+        expression: "sad",
+        text: "多年來，她只能靠著零碎的記憶尋找那個男孩，甚至漸漸忘記了他的長相。",
+        choices: []
+    },
+    // 第 66 段（4/5 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "old_neighborhood_park_night",
+        character: "柳如煙",
+        expression: "sad",
+        text: "她轉頭看著你，輕聲說：「我以前一直以為，只要找到那張照片，就能找回所有記憶。現在我才明白，我真正想找回的，是那個曾經答應陪我看星星的人。」",
+        choices: []
+    },
+    // 第 66 段（5/5 幕）
+    {
+        chapter: 4,
+        title: "那一天的真相",
+        name: "旁白",
+        background: "old_neighborhood_park_night",
+        character: "柳如煙",
+        expression: "sad",
+        text: "你望著夜空，童年的約定終於不再只是夢境。至於你們能否重新走在一起，答案將由此刻的你決定。",
         choices: [
             {
                 text: "告訴她：這次換我陪妳看完星空",
@@ -3278,6 +5268,7 @@ const storyScenes = [
     // ==============================
     // 第 67 幕：最後的選擇
     // ==============================
+    // 第 67 段（1/5 幕）
     {
         chapter: 4,
         title: "最後的選擇",
@@ -3285,7 +5276,51 @@ const storyScenes = [
         background: "old_neighborhood_park_night",
         character: "柳如煙",
         expression: "thinking",
-        text: "夜空中的星星逐漸明亮。柳如煙轉過頭，認真地看著你。「以前的我，總覺得只要找到那個男孩，就能把失去的時間全部補回來。」她停了一下，露出淡淡的笑容。「可是現在，我不想再只活在回憶裡了。我想知道，站在我面前的你，究竟是怎麼想的。」她伸出手，掌心放著那張泛黃的星星卡片。「如果我們真的就是當年約定的兩個人，你願意和我一起走下去嗎？如果不是，我也希望我們能誠實地面對彼此。」你看著她，知道這次不能再用模糊的答案帶過。過去已經有了答案的輪廓，現在該決定的，是你們的未來。",
+        text: "夜空中的星星逐漸明亮。柳如煙轉過頭，認真地看著你。「以前的我，總覺得只要找到那個男孩，就能把失去的時間全部補回來。」",
+        choices: []
+    },
+    // 第 67 段（2/5 幕）
+    {
+        chapter: 4,
+        title: "最後的選擇",
+        name: "旁白",
+        background: "old_neighborhood_park_night",
+        character: "柳如煙",
+        expression: "thinking",
+        text: "她停了一下，露出淡淡的笑容。「可是現在，我不想再只活在回憶裡了。我想知道，站在我面前的你，究竟是怎麼想的。」",
+        choices: []
+    },
+    // 第 67 段（3/5 幕）
+    {
+        chapter: 4,
+        title: "最後的選擇",
+        name: "旁白",
+        background: "old_neighborhood_park_night",
+        character: "柳如煙",
+        expression: "thinking",
+        text: "她伸出手，掌心放著那張泛黃的星星卡片。",
+        choices: []
+    },
+    // 第 67 段（4/5 幕）
+    {
+        chapter: 4,
+        title: "最後的選擇",
+        name: "旁白",
+        background: "old_neighborhood_park_night",
+        character: "柳如煙",
+        expression: "thinking",
+        text: "「如果我們真的就是當年約定的兩個人，你願意和我一起走下去嗎？如果不是，我也希望我們能誠實地面對彼此。」",
+        choices: []
+    },
+    // 第 67 段（5/5 幕）
+    {
+        chapter: 4,
+        title: "最後的選擇",
+        name: "旁白",
+        background: "old_neighborhood_park_night",
+        character: "柳如煙",
+        expression: "thinking",
+        text: "你看著她，知道這次不能再用模糊的答案帶過。過去已經有了答案的輪廓，現在該決定的，是你們的未來。",
         choices: [
             {
                 text: "牽起她的手，約定一起創造新的回憶",
@@ -3383,6 +5418,9 @@ const storyScenes = [
         ]
     }
 ];
+// 舊版存檔（拆幕之前）的場景編號 → 現在對應的第一幕編號
+const LEGACY_SCENE_START = [0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 19, 22, 23, 25, 26, 28, 30, 32, 35, 37, 40, 43, 46, 49, 53, 57, 60, 64, 68, 72, 75, 79, 84, 88, 93, 97, 101, 106, 111, 116, 122, 126, 131, 136, 141, 147, 152, 157, 162, 167, 172, 178, 183, 189, 194, 199, 204, 210, 216, 220, 225, 230, 235];
+
 const totalScenes = storyScenes.length;
 // ========================================
 // 3. 關係與結局判定
@@ -3403,21 +5441,25 @@ function getEnding() {
     }
 
     // 是否做過重要的感情選擇
+    // （這兩個是選項的 flag，記錄在 storyFlags，而不是 specialChoices）
     const madeKeyChoices =
-        specialChoices.has("recalled_letter_emotion") &&
-        specialChoices.has("shared_present_feelings");
+        storyFlags.has("recalled_letter_emotion") &&
+        storyFlags.has("shared_present_feelings");
 
     // 好結局：好感、信任與關鍵選擇都達標
     if (
-        affection >= 80 &&
-        trust >= 60 &&
+        affection >= ENDING_RULES.goodAffection &&
+        trust >= ENDING_RULES.goodTrust &&
         madeKeyChoices
     ) {
         return "好結局";
     }
 
     // 失敗結局：感情或信任不足
-    if (affection < 40 || trust < 30) {
+    if (
+        affection < ENDING_RULES.badAffection ||
+        trust < ENDING_RULES.badTrust
+    ) {
         return "失敗結局";
     }
 
@@ -3437,7 +5479,7 @@ function updateAffection() {
     if (!affectionElement || !levelElement || !fillElement) return;
 
     affectionElement.textContent =
-        `好感度：${affection} / ${MAX_AFFECTION}`;
+        `好感度：${Math.round(affection)} / ${MAX_AFFECTION}`;
 
     levelElement.textContent = `關係：${getRelationship()}`;
 
@@ -3453,12 +5495,38 @@ function updateAffection() {
         levelElement.style.color = "#aaaaaa";
     }
 
-    fillElement.style.width = `${affection}%`;
+    fillElement.style.width = `${(affection / MAX_AFFECTION) * 100}%`;
 }
 
 // ========================================
 // 5. 開始遊戲
 // ========================================
+
+// 重設所有遊戲資料（開始新遊戲、重開時共用，避免漏掉像 trust 這樣的變數）
+function resetGameState() {
+    affection = 0;
+    trust = 0;
+    dialogueStep = 0;
+    currentSceneIndex = 0;
+    hasChosen = false;
+    pendingResponsePages = [];
+    hiddenEndingUnlocked = false;
+    specialChoices.clear();
+    storyFlags.clear();
+    discoveredClues.clear();
+    solvedPuzzles.clear();
+
+    relationshipStage = "normal";
+    currentText = "";
+    endingCgStep = 0;
+
+    // 解謎狀態與視窗
+    cancelPuzzleAnswer();
+    closePuzzleModal();
+    updatePuzzleStatus();
+
+    hideToast();
+}
 
 function startGame() {
     const menu = document.getElementById("menu");
@@ -3470,23 +5538,17 @@ function startGame() {
 
     stopTyping();
     stopEndingTimer();
+
     // 開始播放背景音樂
+    gameStarted = true;
+    updateBgmVolume();
     bgm.play().catch(error => {
         console.warn("背景音樂播放失敗：", error);
     });
-    // 重設遊戲資料
-    affection = 0;
-    dialogueStep = 0;
-    currentSceneIndex = 0;
-    hasChosen = false;
-    hiddenEndingUnlocked = false;
-    specialChoices.clear();
-    storyFlags.clear();
-    discoveredClues.clear();
-    solvedPuzzles.clear();
 
-    relationshipStage = "normal";
-    currentText = "";
+    // 重設遊戲資料
+    resetGameState();
+
     endingCg.style.display = "none";
     endingCg.classList.remove("show-ending", "fade-out");
 
@@ -3495,11 +5557,11 @@ function startGame() {
     const background = document.getElementById("scene-background");
 
     if (background && firstScene.background) {
-        const imagePath = sceneBackgrounds[firstScene.background];
+        const firstUrl = `url("${getBackgroundPath(firstScene.background)}")`;
 
-        if (imagePath) {
-            background.style.backgroundImage = `url("${imagePath}")`;
-        }
+        background.style.backgroundImage = firstUrl;
+        background.dataset.currentBackground = firstUrl;
+        background.dataset.sceneBackground = firstScene.background;
     }
 
     // 重設背景淡入狀態
@@ -3538,6 +5600,52 @@ function startGame() {
 // 6. 顯示劇情
 // ========================================
 
+// 套用場景背景：同一張圖不重複切換，切換時先淡出再淡入
+function applySceneBackground(name) {
+    const background = document.getElementById("scene-background");
+
+    // 先清掉上一次還沒執行完的背景切換，避免快速點擊時背景跳動
+    clearTimeout(backgroundTimer);
+    backgroundTimer = null;
+
+    if (!background || !name) {
+        return;
+    }
+
+    const targetBackground = `url("${getBackgroundPath(name)}")`;
+
+    background.dataset.sceneBackground = name;
+
+    if (background.dataset.currentBackground === targetBackground) {
+        background.classList.remove("background-fade-out");
+        return;
+    }
+
+    background.dataset.currentBackground = targetBackground;
+    background.classList.add("background-fade-out");
+
+    backgroundTimer = setTimeout(() => {
+        backgroundTimer = null;
+        background.style.backgroundImage = targetBackground;
+
+        // 強制瀏覽器先套用新背景與透明度
+        void background.offsetWidth;
+
+        requestAnimationFrame(() => {
+            background.classList.remove("background-fade-out");
+        });
+    }, 300);
+}
+
+// 圖片載入完成後，如果目前正顯示這個場景的替代背景，就換成正式圖片
+function refreshBackgroundIfCurrent(name) {
+    const background = document.getElementById("scene-background");
+
+    if (background && background.dataset.sceneBackground === name) {
+        applySceneBackground(name);
+    }
+}
+
 function renderScene(index) {
     stopTyping();
 
@@ -3549,39 +5657,12 @@ function renderScene(index) {
     currentSceneIndex = index;
     dialogueStep = index;
     hasChosen = false;
+    pendingResponsePages = [];
 
     const scene = storyScenes[index];
 
-    // 1. 更新劇情背景
-    
-    const background = document.getElementById("scene-background");
-
-    if (background && scene.background) {
-        const nextBackground = sceneBackgrounds[scene.background];
-
-        if (nextBackground) {
-            const currentBackground = background.style.backgroundImage;
-            const targetBackground = `url("${nextBackground}")`;
-
-            if (currentBackground !== targetBackground) {
-                
-                background.classList.add("background-fade-out");
-
-                setTimeout(() => {
-                    background.style.backgroundImage = targetBackground;
-
-                    // 強制瀏覽器先套用新背景與透明度
-                    void background.offsetWidth;
-
-                    requestAnimationFrame(() => {
-                        background.classList.remove("background-fade-out");
-                    });
-                }, 300);
-
-            }
-        }
-    }
-
+    // 1. 更新劇情背景（沒有圖片的場景會使用替代背景）
+    applySceneBackground(scene.background);
 
     // 2. 更新角色名稱
     document.getElementById("character-name").textContent =
@@ -3595,10 +5676,27 @@ function renderScene(index) {
     document.getElementById("story-choices").style.display =
         "none";
 
-    // 5. 顯示角色與劇情
-    changeCharacter("normal");
-    typeDialogue(scene.text);
+    // 5. 顯示角色與劇情；文字全部顯示完之後才出現選項
+    changeCharacter(scene.expression || "normal");
     showStoryChoices(scene.choices);
+
+    // 沒有選項的幕：直接視為「已完成」，點擊即可進入下一幕
+    if (!scene.choices || scene.choices.length === 0) {
+        hasChosen = true;
+    }
+
+    typeDialogue(scene.text, revealStoryChoices);
+}
+
+// 劇情文字顯示完畢後，才讓玩家看到並點選選項
+function revealStoryChoices() {
+    if (hasChosen) return;
+
+    const container = document.getElementById("story-choices");
+
+    if (container && container.children.length > 0) {
+        container.style.display = "block";
+    }
 }
 
 // ========================================
@@ -3616,31 +5714,32 @@ function showStoryChoices(choices) {
         button.textContent = choice.text;
 
         button.addEventListener("click", function () {
+            // 選項只會在文字顯示完畢後才出現，這裡只需要防止重複點擊
             if (hasChosen) return;
             playClickSound();
 
-            // 若劇情還在打字，先顯示完整文字
-            if (typingTimer !== null) {
-                stopTyping();
-                document.getElementById("dialogue").textContent =
-                    currentText;
-                return;
-            }
-
             hasChosen = true;
 
+            // 好感度與信任度依比例縮放，並限制在 0 ～ 上限之間
             affection = Math.max(
                 0,
-                Math.min(MAX_AFFECTION, affection + (choice.affection ?? 0))
+                Math.min(
+                    MAX_AFFECTION,
+                    affection + (choice.affection ?? 0) * AFFECTION_SCALE
+                )
             );
 
             if (choice.special) {
                 specialChoices.add(choice.special);
             }
+
             // 更新信任度
             trust = Math.max(
                 0,
-                Math.min(100, trust + (choice.trust ?? 0))
+                Math.min(
+                    MAX_TRUST,
+                    trust + (choice.trust ?? 0) * TRUST_SCALE
+                )
             );
 
             // 記錄這次選擇，供後續劇情判斷
@@ -3648,15 +5747,13 @@ function showStoryChoices(choices) {
                 storyFlags.add(choice.flag);
             }
 
-                // 根據目前好感度更新關係狀態
-                updateRelationshipStage();
-
+            // 根據目前好感度更新關係狀態
+            updateRelationshipStage();
 
             // 收集解謎線索
             if (choice.clue) {
                 collectClue(choice.clue);
             }
-
 
             // 隱藏結局條件：必須收集線索、解開謎題，並做出正確選擇
             if (
@@ -3677,20 +5774,27 @@ function showStoryChoices(choices) {
             document.getElementById("character-name").textContent = "柳如煙";
 
             // 點擊選項後，立即隱藏所有選擇按鈕
-            container.style.display = "none";  
+            container.style.display = "none";
 
             updateAffection();
+
             const responseText =
-        typeof choice.response === "function"
-            ? choice.response()
-            : choice.response;
-            typeDialogue(responseText);
-            });
+                typeof choice.response === "function"
+                    ? choice.response()
+                    : choice.response;
+
+            // 回應文字太長時，分成數幕依序顯示
+            const responsePages = splitDialogueText(responseText);
+
+            pendingResponsePages = responsePages.slice(1);
+            typeDialogue(responsePages[0] ?? responseText);
+        });
 
         container.appendChild(button);
     });
 
-    container.style.display = "block";
+    // 先保持隱藏，等劇情文字顯示完畢後再由 revealStoryChoices() 顯示
+    container.style.display = "none";
 }
 
 // ========================================
@@ -3717,15 +5821,21 @@ function nextDialogue() {
         return;
     }
 
-    // 文字還在逐字顯示：立即顯示全文
+    // 文字還在逐字顯示：立即顯示全文（同時讓選項出現）
     if (typingTimer !== null) {
-        stopTyping();
-        dialogue.textContent = currentText;
+        finishTyping();
         return;
     }
 
     // 尚未選擇回答，不進入下一段
     if (!hasChosen) {
+        return;
+    }
+
+    // 選項回應還有後續幕：先顯示完
+    if (pendingResponsePages.length > 0) {
+        playClickSound();
+        typeDialogue(pendingResponsePages.shift());
         return;
     }
 
@@ -3881,19 +5991,12 @@ function restartGame(playMenuAnimation = true) {
     stopTyping();
     stopEndingTimer();
 
-    affection = 0;
-    dialogueStep = 0;
-    currentSceneIndex = 0;
-    hasChosen = false;
-    hiddenEndingUnlocked = false;
-    specialChoices.clear();
-    storyFlags.clear();
-    discoveredClues.clear();
-    solvedPuzzles.clear();
+    // 清除尚未執行完的背景切換
+    clearTimeout(backgroundTimer);
+    backgroundTimer = null;
 
-    relationshipStage = "normal";
-    currentText = "";
-    endingCgStep = 0;
+    // 重設所有遊戲資料（含 trust、解謎狀態與提示）
+    resetGameState();
 
     const game = document.getElementById("game");
     const menu = document.getElementById("menu");
@@ -3944,46 +6047,89 @@ function restartGame(playMenuAnimation = true) {
 // 12. 打字效果
 // ========================================
 
-function typeDialogue(text) {
-    stopTyping();
+// onDone：文字全部顯示完畢後要執行的動作（逐字顯示或直接顯示都會觸發）
+// ========================================
+// 長文字分頁：把一大段文字切成數幕，一次只顯示一小段
+// ========================================
+const DIALOGUE_PAGE_LENGTH = 62;
 
-    const dialogue = document.getElementById("dialogue");
+// 句子結尾（。！？…）且不在「」裡面時才斷開，並保留引號
+function splitDialogueText(text, maxLen = DIALOGUE_PAGE_LENGTH) {
+    const source = String(text).replace(/\n[ \t]+/g, "\n");
+    const sentences = [];
+    let buffer = "";
+    let depth = 0;
 
-    currentText = text;
-    dialogue.textContent = "";
+    for (let i = 0; i < source.length; i++) {
+        const ch = source[i];
+        const next = source[i + 1];
 
-    dialogue.style.animation = "none";
-    void dialogue.offsetWidth;
-    dialogue.style.animation = "dialogueFadeIn 0.5s ease";
+        buffer += ch;
 
-    // 關閉逐字顯示，直接呈現完整文字
-    if (!gameSettings.typewriter || currentText.length === 0) {
-        dialogue.textContent = currentText;
-        return;
+        if (ch === "「" || ch === "『") {
+            depth++;
+        } else if ((ch === "」" || ch === "』") && depth > 0) {
+            depth--;
+        }
+
+        const endsSentence = /[。！？…]/.test(ch);
+        const followedByCloser =
+            next === "」" || next === "』" || /[。！？…]/.test(next || "");
+
+        if (depth === 0 && endsSentence && !followedByCloser) {
+            sentences.push(buffer);
+            buffer = "";
+        } else if (
+            depth === 0 &&
+            (ch === "」" || ch === "』") &&
+            /[。！？…]/.test(source[i - 1] || "")
+        ) {
+            sentences.push(buffer);
+            buffer = "";
+        }
     }
 
-    let index = 0;
-    const interval = textSpeedMap[gameSettings.textSpeed] || 35;
+    if (buffer.trim()) {
+        sentences.push(buffer);
+    }
 
-    typingTimer = setInterval(() => {
-        dialogue.textContent += currentText[index];
-        index++;
+    const pages = [];
+    let current = "";
 
-        if (index >= currentText.length) {
-            clearInterval(typingTimer);
-            typingTimer = null;
-            dialogue.textContent = currentText;
+    sentences.forEach(sentence => {
+        if (current && current.length + sentence.length > maxLen) {
+            pages.push(current);
+            current = sentence;
+        } else {
+            current += sentence;
         }
-    }, interval);
+    });
+
+    if (current) {
+        pages.push(current);
+    }
+
+    // 最後一幕太短時，併回前一幕
+    if (pages.length > 1 && pages[pages.length - 1].length < 14) {
+        const last = pages.pop();
+        pages[pages.length - 1] += last;
+    }
+
+    return pages;
 }
 
-function typeDialogue(text) {
+// 選項回應還沒顯示完的後續幕（點擊後依序顯示）
+let pendingResponsePages = [];
+
+function typeDialogue(text, onDone = null) {
     // 清除上一段尚未完成的打字效果
     stopTyping();
 
     const dialogue = document.getElementById("dialogue");
 
-    currentText = text;
+    // 劇情資料裡有些多行字串帶有縮排空白，統一清掉每行開頭的空白
+    currentText = String(text).replace(/\n[ \t]+/g, "\n");
+    afterTyping = onDone;
     dialogue.textContent = "";
 
     // 重新播放文字淡入動畫
@@ -3994,6 +6140,7 @@ function typeDialogue(text) {
     // 關閉逐字效果時，直接顯示完整文字
     if (!gameSettings.typewriter || currentText.length === 0) {
         dialogue.textContent = currentText;
+        runAfterTyping();
         return;
     }
 
@@ -4011,6 +6158,22 @@ function typeDialogue(text) {
     }, interval);
 }
 
+// 文字顯示完畢後：更新螢幕閱讀器的朗讀區，並執行 onDone
+function runAfterTyping() {
+    const live = document.getElementById("sr-live");
+
+    if (live) {
+        live.textContent = currentText;
+    }
+
+    const callback = afterTyping;
+    afterTyping = null;
+
+    if (typeof callback === "function") {
+        callback();
+    }
+}
+
 /* 立即顯示完整對話 */
 function finishTyping() {
     if (typingTimer === null) {
@@ -4023,55 +6186,90 @@ function finishTyping() {
     const dialogue = document.getElementById("dialogue");
     dialogue.textContent = currentText;
 
+    runAfterTyping();
+
     return true;
 }
 
-/* 停止逐字顯示 */
+/* 停止逐字顯示（不會觸發 onDone，用於重設或切換場景） */
 function stopTyping() {
     if (typingTimer !== null) {
         clearInterval(typingTimer);
         typingTimer = null;
     }
+
+    afterTyping = null;
 }
 
 // ========================================
 // 13. 切換女主角表情
 // ========================================
 
+// 已經有圖片的表情。新增圖片後，把名稱與路徑加在這裡即可。
+const characterExpressions = {
+    normal: "images/heroine.png",
+    happy: "images/heroine_happy.png",
+    angry: "images/heroine_angry.png",
+    love: "images/heroine_love.png"
+};
+
+// 劇情中用到、但還沒有圖片的表情，先借用相近的表情
+const expressionFallbacks = {
+    sad: "normal",
+    surprised: "normal",
+    thinking: "normal",
+    nervous: "normal"
+};
+
+let characterSwapTimer = null;
+
 function changeCharacter(expression) {
-    const characterArea = document.getElementById("character-area");
     const characterImage = document.getElementById("character-image");
 
-    const expressions = {
-        normal: "images/heroine.png",
-        happy: "images/heroine_happy.png",
-        angry: "images/heroine_angry.png",
-        love: "images/heroine_love.png"
-    };
+    // 找出實際要顯示的表情：自己的圖片 → 替代表情 → normal
+    let resolved = expression || "normal";
 
-    const nextImage = expressions[expression] || expressions.normal;
+    if (!characterExpressions[resolved]) {
+        resolved = expressionFallbacks[resolved] || "normal";
+    }
+
+    const nextImage = characterExpressions[resolved] || characterExpressions.normal;
 
     // 如果圖片相同，就不重複切換
-    if (characterImage.dataset.expression === expression) {
+    if (characterImage.dataset.expression === resolved) {
         return;
     }
 
-    characterImage.dataset.expression = expression;
+    characterImage.dataset.expression = resolved;
 
     // 先淡出舊表情
     characterImage.style.opacity = "0";
 
-    setTimeout(() => {
-        characterImage.src = nextImage;
+    clearTimeout(characterSwapTimer);
+    characterSwapTimer = setTimeout(() => {
+        characterSwapTimer = null;
+
+        // 圖片載入失敗時，退回預設立繪，避免角色消失
+        characterImage.onerror = () => {
+            characterImage.onerror = null;
+
+            if (!characterImage.src.endsWith(characterExpressions.normal)) {
+                characterImage.src = characterExpressions.normal;
+            }
+
+            characterImage.style.opacity = "1";
+        };
 
         // 等待新圖片載入後淡入
-        if (characterImage.complete) {
+        characterImage.onload = () => {
             characterImage.style.opacity = "1";
-        } else {
-            characterImage.onload = () => {
-                characterImage.style.opacity = "1";
-                characterImage.onload = null;
-            };
+            characterImage.onload = null;
+        };
+
+        characterImage.src = nextImage;
+
+        if (characterImage.complete && characterImage.naturalWidth > 0) {
+            characterImage.style.opacity = "1";
         }
     }, 180);
 }
@@ -4188,13 +6386,13 @@ function toggleFullscreen() {
     }
 
     if (!document.documentElement.requestFullscreen) {
-        alert("目前的瀏覽器不支援全螢幕功能。");
+        showToast("目前的瀏覽器不支援全螢幕功能。");
         return;
     }
 
     document.documentElement.requestFullscreen().catch(error => {
         console.warn("無法切換全螢幕。", error);
-        alert("無法開啟全螢幕，請確認瀏覽器是否允許。");
+        showToast("無法開啟全螢幕，請確認瀏覽器是否允許。");
     });
 }
 
@@ -4249,10 +6447,9 @@ function initializeSettings() {
 
         saveGameSettings();
 
-        // 若目前正在顯示文字，立即套用新設定
+        // 若目前正在顯示文字，立即套用新設定（並讓選項出現）
         if (typingTimer !== null && !gameSettings.typewriter) {
-            stopTyping();
-            document.getElementById("dialogue").textContent = currentText;
+            finishTyping();
         }
     });
 
@@ -4263,17 +6460,26 @@ function initializeSettings() {
         }
     });
 
-    // 按 Escape 關閉設定
+    // 按 Escape 關閉設定或解謎視窗
     document.addEventListener("keydown", event => {
-        if (
-            event.key === "Escape" &&
-            overlay.style.display !== "none"
-        ) {
+        if (event.key !== "Escape") return;
+
+        if (overlay.style.display !== "none") {
             toggleSettings(false);
+            return;
+        }
+
+        const puzzleModal = document.getElementById("puzzle-modal");
+
+        if (puzzleModal && puzzleModal.style.display === "flex") {
+            closePuzzleModal();
         }
     });
 
     loadGameSettings();
+
+    // 一開始就套用儲存的音樂音量（原本只有拖動滑桿時才會套用）
+    updateBgmVolume();
 }
 
 // HTML 在 script.js 前面，因此可以直接初始化
@@ -4293,20 +6499,30 @@ gameScreen.addEventListener("click", function (event) {
     nextDialogue();
 });
 
-function saveGame() {   
-    if (
-        currentSceneIndex < 0 ||
-        currentSceneIndex >= storyScenes.length
-    ) {
-        alert("目前沒有可保存的劇情進度！");
+const SAVE_KEY = "heartDaysSave";
+const SAVE_VERSION = 3;   // 3：劇情拆成多幕，場景編號與舊版不同
+const LEGACY_SCENE_COUNT = LEGACY_SCENE_START.length;
+
+function saveGame() {
+    // 已經做出選擇（好感度已加上去）時，存成「下一幕開頭」，
+    // 否則讀檔後會再選一次，同一個選項的數值會重複計算。
+    // 沒有選項的幕沒有數值變化，存成「目前這一幕」，讀檔後可以重看一次。
+    const currentHasChoices =
+        Boolean(storyScenes[currentSceneIndex]?.choices?.length);
+    const saveIndex =
+        hasChosen && currentHasChoices ? currentSceneIndex + 1 : currentSceneIndex;
+
+    if (saveIndex < 0 || saveIndex >= storyScenes.length) {
+        showToast("最後一幕選擇之後就是結局，無法存檔。");
         return;
     }
-        
+
     const saveData = {
-        version: 1,
+        version: SAVE_VERSION,
         affection: affection,
-        dialogueStep: dialogueStep,
-        currentSceneIndex: currentSceneIndex,
+        trust: trust,
+        dialogueStep: saveIndex,
+        currentSceneIndex: saveIndex,
         hiddenEndingUnlocked: hiddenEndingUnlocked,
         specialChoices: Array.from(specialChoices),
         discoveredClues: Array.from(discoveredClues),
@@ -4316,47 +6532,115 @@ function saveGame() {
         savedAt: new Date().toLocaleString("zh-TW")
     };
 
+    let hasExistingSave = false;
 
-    // 如果已經有存檔，先詢問是否覆蓋
-    if (localStorage.getItem("heartDaysSave")) {
-        const confirmOverwrite = confirm(
-            "已經有一份存檔，確定要覆蓋嗎？"
-        );
-
-        if (!confirmOverwrite) {
-            return;
-        }
+    try {
+        hasExistingSave = localStorage.getItem(SAVE_KEY) !== null;
+    } catch (error) {
+        console.error("檢查存檔失敗：", error);
     }
 
-    localStorage.setItem(
-        "heartDaysSave",
-        JSON.stringify(saveData)
-    );
-    document.getElementById("save-status").textContent =
-    "上次存檔：" + saveData.savedAt;
-    alert("遊戲進度已保存！");
+    // 如果已經有存檔，用遊戲內視窗詢問是否覆蓋（不使用瀏覽器內建的 confirm）
+    if (hasExistingSave) {
+        showConfirmDialog(
+            "已經有一份存檔，確定要覆蓋嗎？",
+            () => writeSaveData(saveData)
+        );
+        return;
+    }
+
+    writeSaveData(saveData);
 }
+
+function writeSaveData(saveData) {
+    try {
+        localStorage.setItem(SAVE_KEY, JSON.stringify(saveData));
+    } catch (error) {
+        console.error("存檔失敗：", error);
+        showToast("無法存檔，請確認瀏覽器允許儲存資料（不是無痕模式）。");
+        return;
+    }
+
+    updateSaveStatus();
+    showToast("遊戲進度已保存！");
+}
+
+// ========================================
+// 遊戲內確認視窗
+// ========================================
+let confirmCallback = null;
+
+function showConfirmDialog(message, onConfirm) {
+    const overlay = document.getElementById("confirm-overlay");
+    const text = document.getElementById("confirm-message");
+
+    if (!overlay || !text) {
+        // 找不到視窗時，直接執行，避免功能卡住
+        onConfirm();
+        return;
+    }
+
+    confirmCallback = onConfirm;
+    text.textContent = message;
+    overlay.style.display = "flex";
+
+    const okButton = document.getElementById("confirm-ok");
+
+    if (okButton) {
+        okButton.focus();
+    }
+}
+
+function closeConfirmDialog(accepted) {
+    const overlay = document.getElementById("confirm-overlay");
+    const callback = confirmCallback;
+
+    confirmCallback = null;
+
+    if (overlay) {
+        overlay.style.display = "none";
+    }
+
+    if (accepted && typeof callback === "function") {
+        callback();
+    }
+}
+
+document.addEventListener("keydown", event => {
+    const overlay = document.getElementById("confirm-overlay");
+
+    if (
+        event.key === "Escape" &&
+        overlay &&
+        overlay.style.display === "flex"
+    ) {
+        closeConfirmDialog(false);
+    }
+});
 
 
 function loadGame() {
-    const savedData = localStorage.getItem("heartDaysSave");
+    let savedData = null;
+
+    try {
+        savedData = localStorage.getItem(SAVE_KEY);
+    } catch (error) {
+        console.error("讀取存檔失敗：", error);
+    }
 
     if (!savedData) {
-        alert("目前沒有保存的遊戲進度！");
+        showToast("目前沒有保存的遊戲進度！");
         return;
     }
 
     try {
         const saveData = JSON.parse(savedData);
-        
-        if (
-            saveData.version !== undefined &&
-            saveData.version !== 1
-        ) {
-            alert("這份存檔的版本不相容，請使用相容版本的遊戲。");
+        const version = saveData.version ?? 1;
+
+        if (version < 1 || version > SAVE_VERSION) {
+            showToast("這份存檔的版本不相容，請使用相容版本的遊戲。");
             return;
         }
-
 
         // 檢查存檔資料是否完整
         if (
@@ -4364,22 +6648,49 @@ function loadGame() {
             typeof saveData.currentSceneIndex !== "number" ||
             !Array.isArray(saveData.specialChoices) ||
             saveData.currentSceneIndex < 0 ||
-            saveData.currentSceneIndex >= storyScenes.length
+            saveData.currentSceneIndex >=
+                (version < 3 ? LEGACY_SCENE_COUNT : storyScenes.length)
         ) {
-            alert("存檔資料格式錯誤，無法讀取！");
+            showToast("存檔資料格式錯誤，無法讀取！");
             return;
         }
 
-        affection = Math.max(
-            0,
-            Math.min(MAX_AFFECTION, saveData.affection)
-        );
+        // 先重設，再套用存檔內容，避免殘留上一輪的狀態
+        stopTyping();
+        resetGameState();
 
-        currentSceneIndex = saveData.currentSceneIndex;
+        if (version === 1) {
+            // 舊版存檔：好感度還沒縮放、也沒有記錄信任度，轉成目前的數值範圍
+            affection = Math.max(
+                0,
+                Math.min(MAX_AFFECTION, saveData.affection * AFFECTION_SCALE)
+            );
+            trust = ENDING_RULES.badTrust;
+        } else {
+            affection = Math.max(
+                0,
+                Math.min(MAX_AFFECTION, saveData.affection)
+            );
+
+            trust = Math.max(
+                0,
+                Math.min(
+                    MAX_TRUST,
+                    typeof saveData.trust === "number" ? saveData.trust : 0
+                )
+            );
+        }
+
+        // v1、v2 存檔的場景編號是拆幕之前的，轉成對應的第一幕
+        currentSceneIndex =
+            version < 3
+                ? LEGACY_SCENE_START[saveData.currentSceneIndex]
+                : saveData.currentSceneIndex;
         dialogueStep = currentSceneIndex;
         hiddenEndingUnlocked =
             saveData.hiddenEndingUnlocked === true;
         specialChoices = new Set(saveData.specialChoices);
+
         // 恢復已收集的線索
         discoveredClues = new Set(
             Array.isArray(saveData.discoveredClues)
@@ -4388,7 +6699,7 @@ function loadGame() {
                 )
                 : []
         );
-        
+
         // 恢復已解開的謎題
         solvedPuzzles = new Set(
             Array.isArray(saveData.solvedPuzzles)
@@ -4409,27 +6720,37 @@ function loadGame() {
         relationshipStage =
             saveData.relationshipStage || "normal";
 
-
-
         hasChosen = false;
 
+        updatePuzzleStatus();
         updateAffection();
         renderScene(currentSceneIndex);
-
         updateSaveStatus();
 
-        alert("存檔資料已讀取！");
+        showToast(
+            version === 1
+                ? "舊版存檔已讀取並轉換為新的數值範圍。"
+                : "存檔資料已讀取！"
+        );
     } catch (error) {
         console.error("讀檔失敗：", error);
-        alert("存檔資料損壞，無法讀取！");
+        showToast("存檔資料損壞，無法讀取！");
     }
 }
 
 function updateSaveStatus() {
     const status = document.getElementById("save-status");
-    const savedData = localStorage.getItem("heartDaysSave");
 
     if (!status) return;
+
+    let savedData = null;
+
+    try {
+        savedData = localStorage.getItem(SAVE_KEY);
+    } catch (error) {
+        status.textContent = "";
+        return;
+    }
 
     if (!savedData) {
         status.textContent = "尚未存檔";

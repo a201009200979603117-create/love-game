@@ -55,17 +55,6 @@ button:disabled {
    2. 遊戲卡片
 ======================================== */
 
-.game-card {
-    background-color: #222238;
-    width: 350px;
-    max-width: calc(100% - 40px);
-    padding: 35px;
-    border-radius: 20px;
-    border: 1px solid #514878;
-    box-shadow: 0 0 30px rgba(124, 77, 255, 0.2);
-    margin: 20px;
-}
-
 /* ========================================
    3. 遊戲主畫面
 ======================================== */
@@ -173,19 +162,6 @@ button:disabled {
     margin: 20px 0;
 }
 
-#character-placeholder {
-    width: 150px;
-    height: 200px;
-    border: 2px dashed #514878;
-    border-radius: 12px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    color: #b9a0ff;
-    font-size: 14px;
-    background-color: #191927;
-}
-
 #character-image {
     display: block;
     width: 220px;
@@ -286,16 +262,6 @@ button:disabled {
     line-height: 1.7;
     white-space: normal;
     overflow-wrap: anywhere;
-}
-
-#game #next-button {
-    width: 75%;
-    margin: 15px auto;
-    background-color: #6541ce;
-}
-
-#game #next-button:hover {
-    background-color: #8967f0;
 }
 
 /* ========================================
@@ -558,15 +524,6 @@ button:disabled {
     margin-left: 18px;
 }
 
-.menu-footer {
-    position: relative;
-    z-index: 1;
-    margin-top: 55px;
-    font-size: 10px;
-    letter-spacing: 3px;
-    color: #8aa8bc;
-}
-
 /* ========================================
    13. 手機版與小螢幕
 ======================================== */
@@ -604,11 +561,7 @@ button:disabled {
         font-size: 13px;
     }
 
-    .menu-footer {
-        margin-top: 35px;
-    }
-
-    #menu #start-button {
+#menu #start-button {
         min-width: 160px;
     }
 
@@ -632,11 +585,7 @@ button:disabled {
     }
 
     #story-choices button,
-    #game #next-button {
-        width: 90%;
-    }
-
-    #ending-dialogue-box {
+#ending-dialogue-box {
         left: 3%;
         bottom: 2%;
         width: 94%;
@@ -701,12 +650,7 @@ button:disabled {
     }
 
     #story-choices button,
-    #game #next-button {
-        width: 94%;
-        font-size: 14px;
-    }
-
-    #ending-cg-title {
+#ending-cg-title {
         font-size: 19px;
     }
 
@@ -889,11 +833,6 @@ button:focus-visible {
 }
 
 /* 下一步按鈕 */
-#game #next-button {
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 5px 16px rgba(101, 65, 206, 0.16);
-}
-
 /* ========================================
    16. 主選單細節升級
 ======================================== */
@@ -965,14 +904,7 @@ button {
     }
 
     #story-choices button,
-    #game #next-button {
-        width: 94%;
-        min-height: 46px;
-        padding: 12px 15px;
-        font-size: 15px;
-    }
-
-    #affection-bar {
+#affection-bar {
         max-width: 85%;
     }
 
@@ -1011,14 +943,7 @@ button {
     }
 
     #story-choices button,
-    #game #next-button {
-        width: 96%;
-        min-height: 46px;
-        padding: 11px 12px;
-        font-size: 14px;
-    }
-
-    #affection-panel {
+#affection-panel {
         padding: 8px;
     }
 
@@ -1877,11 +1802,6 @@ body {
     background: rgba(119, 82, 165, 0.94);
     border-color: rgba(255, 255, 255, 0.75);
     transform: translateX(-5px);
-}
-
-/* 移除舊版下一段按鈕的影響 */
-#next-button {
-    display: none !important;
 }
 
 /* 結局 CG 保持全螢幕 */
@@ -3059,4 +2979,174 @@ body {
         opacity: 1;
         transform: translateY(0);
     }
+}
+
+
+/* ==============================
+   修正與補強（存檔狀態、提示框、朗讀區、手機工具列）
+============================== */
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+#save-status {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 2px;
+    max-width: 90vw;
+    padding: 4px 10px;
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 12px;
+    letter-spacing: 1px;
+    white-space: nowrap;
+    background: rgba(24, 20, 42, 0.5);
+    border-radius: 999px;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    pointer-events: none;
+}
+
+#save-status:empty {
+    display: none;
+}
+
+#game-toast {
+    position: fixed;
+    top: 38%;
+    left: 50%;
+    z-index: 10000;
+    max-width: min(90vw, 420px);
+    padding: 12px 22px;
+    color: #fff;
+    font-size: 14px;
+    line-height: 1.5;
+    text-align: center;
+    background: rgba(40, 28, 70, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 14px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(-50%, -16px);
+    transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+#game-toast.show {
+    opacity: 1;
+    transform: translate(-50%, 0);
+}
+
+/* 解謎視窗：由 script.js 以 inline style 切換 display */
+.puzzle-modal[style*="flex"] {
+    display: flex;
+}
+
+#game #game-toolbar button {
+    width: auto;
+    min-width: 0;
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+    #game-toolbar {
+        top: 10px;
+        left: 8px;
+        gap: 5px;
+    }
+
+    #game-toolbar button {
+        padding: 7px 8px;
+        font-size: 12px;
+        letter-spacing: 0;
+    }
+
+    /* 好感度面板移到工具列下方，避免互相遮住 */
+    #affection-panel {
+        top: 58px;
+        right: 10px;
+        width: min(190px, 48vw);
+        padding: 8px 12px;
+    }
+
+    #save-status {
+        top: calc(100% + 6px);
+        font-size: 11px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #game-toast {
+        transition: none;
+    }
+}
+
+
+/* 遊戲內確認視窗 */
+#confirm-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10001;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(8, 6, 20, 0.7);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+}
+
+#confirm-panel {
+    width: min(360px, 100%);
+    padding: 24px 22px 20px;
+    color: #fff;
+    text-align: center;
+    background: linear-gradient(145deg, #2a2050, #3a2a63);
+    border: 1px solid rgba(216, 190, 255, 0.45);
+    border-radius: 16px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+}
+
+#confirm-message {
+    margin: 0 0 20px;
+    font-size: 16px;
+    line-height: 1.7;
+}
+
+#confirm-actions {
+    display: flex;
+    gap: 12px;
+}
+
+#confirm-actions button {
+    flex: 1;
+    padding: 11px 14px;
+    color: #fff;
+    font-size: 14px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+#confirm-actions button:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+#confirm-actions #confirm-ok {
+    background: rgba(189, 140, 255, 0.55);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+#confirm-actions #confirm-ok:hover {
+    background: rgba(189, 140, 255, 0.8);
 }

@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -91,12 +90,12 @@
             >
                 📂 讀檔
             </button>
-            <button id="puzzle-button" 
-            onclick="openPuzzleModal()"
+            <button
+                id="puzzle-button"
+                onclick="openPuzzleModal()"
             >
-            🔍 解謎
+                🔍 解謎
             </button>
-
 
             <button
                 id="settings-button"
@@ -105,6 +104,9 @@
             >
                 ⚙ 設定
             </button>
+
+            <!-- 存檔狀態（由 script.js 的 updateSaveStatus 更新） -->
+            <span id="save-status" aria-live="polite"></span>
         </div>
 
 
@@ -126,13 +128,12 @@
         <section id="dialogue-box">
             <h3 id="character-name">旁白</h3>
 
-            <p id="dialogue">
-                你走進教室，發現一位陌生的女孩坐在窗邊。
-            </p>
+            <p id="dialogue">你走進教室，發現一位陌生的女孩坐在窗邊。</p>
 
-            <div id="scene-progress">
-                第 1 / 20 段
-            </div>
+            <div id="scene-progress">第 1 / 236 段</div>
+
+            <!-- 給螢幕閱讀器的朗讀區：整段文字顯示完才更新，避免逐字朗讀 -->
+            <div id="sr-live" class="sr-only" aria-live="polite" aria-atomic="true"></div>
         </section>
 
 
@@ -337,8 +338,42 @@
 
     </main>
     
+    <!-- 遊戲內提示（取代 alert） -->
+    <div id="game-toast" role="status" aria-live="polite"></div>
+
+    <!-- 遊戲內確認視窗（取代瀏覽器的 confirm） -->
+    <div
+        id="confirm-overlay"
+        style="display: none;"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="confirm-message"
+    >
+        <div id="confirm-panel">
+            <p id="confirm-message"></p>
+
+            <div id="confirm-actions">
+                <button type="button" id="confirm-cancel"
+                        onclick="closeConfirmDialog(false)">
+                    取消
+                </button>
+
+                <button type="button" id="confirm-ok"
+                        onclick="closeConfirmDialog(true)">
+                    確定覆蓋
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- 解謎彈窗 -->
-    <div id="puzzle-modal" class="puzzle-modal">
+    <div
+        id="puzzle-modal"
+        class="puzzle-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="解謎筆記"
+    >
         <div class="puzzle-window">
 
             <div class="puzzle-header">
