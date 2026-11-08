@@ -73,10 +73,8 @@
     const inTransition = t => SPLITS.some(s => (t >= s.start - 0.3 && t < s.start + TRANS) || (t >= s.end - 0.2 && t < s.end + TRANS));
 
     function choreograph(ch) {
-        const A = ch.line({ x: 0.5, y: 0.64, alpha: 0, speed: 0.9 });
+        const A = ch.line({ x: 0.5, y: 0.74, speed: 0.9 });
         const B = ch.line({ x: 0.5, y: 0.74, alpha: 0, speed: 0.9 });
-        A.to("alpha", 0, 1.5, 1, "outSine");
-        A.to("y", 0, 2.5, 0.74, "outCubic");
 
         // 一般段落：慢慢左右擺動
         let t = 3;

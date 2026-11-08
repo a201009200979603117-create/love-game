@@ -182,12 +182,8 @@
     }
 
     function choreograph(ch) {
-        const A = ch.line({ x: 0.5, y: 0.62, alpha: 0 });
+        const A = ch.line({ x: 0.5, y: 0.72 });
         const B = ch.line({ x: 0.5, y: 0.76, alpha: 0 });
-
-        // 前奏：主線浮現
-        A.to("alpha", 0, 2, 1, "outSine");
-        A.to("y", 0, 4, 0.72, "outCubic");
 
         // 主歌：左右輕輕擺動
         for (let k = 0; k < 4; k++) {

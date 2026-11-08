@@ -22,12 +22,10 @@
 
     /* ---------- 教學內容 ---------- */
     function lesson(ch) {
-        const A = ch.line({ x: 0.5, y: 0.66, alpha: 0 });
+        const A = ch.line({ x: 0.5, y: 0.74 });
         const B = ch.line({ x: 0.5, y: 0.74, alpha: 0 });
         const bar = n => n * 4;
 
-        A.to("alpha", 0, 2, 1, "outSine");
-        A.to("y", 0, 3, 0.74, "outCubic");
 
         ch.text(bar(0) + 0.5, bar(2) - 0.5, "歡迎來到弦光\n音符會沿著光弦落下");
 

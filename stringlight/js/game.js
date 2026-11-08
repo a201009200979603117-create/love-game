@@ -31,6 +31,12 @@
         holdGrace: 0.05,   // 手指短暫離開判定範圍的容許時間
         holdEarly: 0.06    // 尾端前多久放手仍算完成
     };
+    // 開場與結尾：判定線從中間展開／收回
+    const OPEN_LINE = 1.0;     // 展開所需秒數；展開完成前不顯示任何音符
+    const OPEN_GAP = 0.4;      // 展開完成到第一個音符出現至少間隔幾秒
+    const CLOSE_START = 0.5;   // 最後一個音符結束後多久開始收回
+    const CLOSE_LINE = 0.8;
+
     const ACC_WEIGHT = { perfect: 1, good: 0.65, bad: 0, miss: 0 };
 
     const COLORS = {
@@ -95,7 +101,7 @@
             this.paused = false;
             this.finished = false;
             this.clock = { ct: -1, pt: 0, last: -Infinity };
-            this.endTime = this.chart.duration + 1.4;
+            this.endTime = this.chart.duration + CLOSE_START + CLOSE_LINE + 0.2;
 
             this.handlers = [];
             this.bindInput();
@@ -188,7 +194,10 @@
         /* ---------- 開始／暫停 ---------- */
         start() {
             const ctx = this.audio.ctx;
-            const leadIn = 1.6;
+            // 預備時間要夠長：判定線完全展開後，第一個音符才會進入畫面
+            this.firstAppear = this.firstNoteAppear();
+            const leadIn = Math.max(2.2, OPEN_LINE + OPEN_GAP - this.firstAppear);
+            this.introStart = -leadIn;
             this.startAt = ctx.currentTime + leadIn;
             this.player.start(this.startAt);
             this.loop = this.loop.bind(this);
@@ -220,6 +229,41 @@
             const g = this.g;
             g.setTransform(1, 0, 0, 1, 0, 0);
             g.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        }
+
+        // 第一個音符最早在什麼時候進入畫面（秒，可能是負的）
+        firstNoteAppear() {
+            const v = this.view;
+            const margin = v.noteW;
+            const onScreen = (n, t) => {
+                const l = n.line;
+                const tr = l.tracks;
+                const ang = (sample(tr.angle, t) * Math.PI) / 180;
+                const cx = v.sx + sample(tr.x, t) * v.sw;
+                const cy = v.sy + sample(tr.y, t) * v.sh;
+                const d = (n.floor - l.floorAt(t)) * n.speed * v.unit * n.side;
+                const a = n.pos * v.sw;
+                const x = cx + Math.cos(ang) * a + Math.sin(ang) * d;
+                const y = cy + Math.sin(ang) * a - Math.cos(ang) * d;
+                return x > -margin && x < v.W + margin && y > -margin && y < v.H + margin;
+            };
+            let first = Infinity;
+            for (const n of this.notes.slice(0, 40)) {
+                // 從音符的判定時間往前找，直到它離開畫面為止
+                let t = n.t;
+                while (t > n.t - 15 && onScreen(n, t - 0.02)) t -= 0.02;
+                first = Math.min(first, t);
+            }
+            return Number.isFinite(first) ? first : 0;
+        }
+
+        // 判定線展開／收回的比例（0～1）
+        lineScale(t) {
+            const open = (t - this.introStart) / OPEN_LINE;
+            if (open < 1) return Math.max(0, 1 - Math.pow(1 - Math.max(0, open), 3));
+            const close = (t - this.chart.duration - CLOSE_START) / CLOSE_LINE;
+            if (close > 0) return Math.max(0, 1 - close * close * close);
+            return 1;
         }
 
         /* ---------- 輸入 ---------- */
@@ -317,7 +361,7 @@
         }
 
         /* ---------- 判定 ---------- */
-        record(n, kind, dt) {
+        record(n, kind, dt, effectKind) {
             this.counts[kind]++;
             this.judged++;
             if (kind === "miss" || kind === "bad") {
@@ -328,7 +372,7 @@
                 if (this.combo > this.maxCombo) this.maxCombo = this.combo;
             }
             if (dt !== null && dt !== undefined && kind !== "miss") this.offsets.push(dt);
-            if (kind !== "miss") this.spawnHit(n, kind);
+            if (kind !== "miss") this.spawnHit(n, effectKind || kind);
         }
 
         processTaps() {
@@ -466,12 +510,13 @@
             while (this.first < notes.length && notes[this.first].state === DONE) this.first++;
         }
 
-        // 長押：按下時決定 Perfect 或 Good（沒有 Bad），尾端只檢查有沒有按到最後。
-        // 按完就照按下時的判定計分，中途放開就是 Miss。
+        // 長押：按下時（頭判）決定 Perfect 或 Good，沒有 Bad；
+        // 尾判只有 Perfect 或 Miss：按到尾端前 WIN.holdEarly 秒以內才算完成，太早放開就是 Miss。
+        // 完成時以頭判的結果計分，尾端顯示 Perfect 的特效。
         finishHold(n) {
             n.state = DONE;
             n.doneAt = n.end;
-            this.record(n, n.result, null);
+            this.record(n, n.result, null, "perfect");
         }
 
         miss(n) {
@@ -609,36 +654,61 @@
                 }
             }
             const fade = lineColor + "00";
+            const scale = this.lineScale(t);
             for (const l of this.lines) {
-                if (l.alpha <= 0.003) continue;
+                if (l.alpha <= 0.003 || scale <= 0) continue;
+                const len = Math.min(l.len, v.reach) * scale;
                 g.save();
                 g.translate(l.cx, l.cy);
                 g.rotate(l.ang);
                 g.globalAlpha = l.alpha;
                 g.shadowColor = glow;
                 g.shadowBlur = 10;
-                if (l.len >= v.reach) {
+                if (len >= v.reach) {
                     g.fillStyle = lineColor;
                 } else {
-                    // 有長度的判定線：兩端淡出
-                    const grad = g.createLinearGradient(-l.len, 0, l.len, 0);
+                    // 有長度（或正在展開）的判定線：兩端淡出
+                    const grad = g.createLinearGradient(-len, 0, len, 0);
                     grad.addColorStop(0, fade);
                     grad.addColorStop(0.18, lineColor);
                     grad.addColorStop(0.82, lineColor);
                     grad.addColorStop(1, fade);
                     g.fillStyle = grad;
                 }
-                g.fillRect(-l.len, -v.lineW / 2, l.len * 2, v.lineW);
+                g.fillRect(-len, -v.lineW / 2, len * 2, v.lineW);
                 g.restore();
             }
 
-            // 音符：先畫長押，再畫一般音符
-            this.drawNotes(t, true);
-            this.drawNotes(t, false);
+            // 音符：先畫長押，再畫一般音符（判定線展開完成前不畫）
+            if (t >= this.introStart + OPEN_LINE) {
+                this.drawNotes(t, true);
+                this.drawNotes(t, false);
+            }
             this.drawEffects();
             this.drawHints();
             this.drawTexts(t);
+            this.drawTitleCard(t);
             this.drawHud(t);
+        }
+
+        // 開場時在畫面中央顯示曲名與難度
+        drawTitleCard(t) {
+            const start = this.introStart + 0.15;
+            const end = Math.min(-0.2, this.firstAppear - 0.15);
+            if (t < start || t > end) return;
+            const a = Math.max(0, Math.min(1, (t - start) / 0.35, (end - t) / 0.35));
+            const g = this.g;
+            const v = this.view;
+            g.globalAlpha = a;
+            g.textAlign = "center";
+            g.textBaseline = "middle";
+            g.fillStyle = "#ffffff";
+            g.font = "600 " + Math.round(v.sh * 0.085) + "px " + FONT;
+            g.fillText(this.meta.title, v.W / 2, v.sy + v.sh * 0.38);
+            g.font = "500 " + Math.round(v.sh * 0.034) + "px " + FONT;
+            g.fillStyle = "rgba(255, 255, 255, 0.72)";
+            g.fillText(this.meta.difficulty, v.W / 2, v.sy + v.sh * 0.38 + v.sh * 0.085);
+            g.globalAlpha = 1;
         }
 
         drawNotes(t, holdsPass) {
