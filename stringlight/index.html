@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#07070f">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="弦光">
+    <title>弦光 Stringlight</title>
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" href="assets/icons/icon-192.png">
+    <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+    <canvas id="stage" aria-label="遊戲畫面"></canvas>
+
+    <!-- 標題 -->
+    <section id="screen-title" class="screen">
+        <div class="title-bg"></div>
+        <div class="title-logo">
+            <h1>弦光</h1>
+            <div class="title-line"></div>
+            <p class="title-en">S T R I N G L I G H T</p>
+        </div>
+        <p class="title-tap">點擊畫面開始</p>
+        <p class="title-note">建議戴耳機遊玩</p>
+    </section>
+
+    <!-- 選曲 -->
+    <section id="screen-select" class="screen" hidden>
+        <div class="select-bg" id="select-bg"></div>
+        <header class="select-top">
+            <p class="select-heading">選擇歌曲</p>
+            <div class="top-actions">
+                <button type="button" class="icon-btn" id="btn-help" aria-label="玩法說明">?</button>
+                <button type="button" class="icon-btn" id="btn-settings" aria-label="設定">⚙</button>
+            </div>
+        </header>
+        <div class="select-body">
+            <ul id="song-list" class="song-list" role="listbox" aria-label="歌曲"></ul>
+            <div class="song-detail">
+                <div class="cover-wrap">
+                    <img id="detail-cover" alt="">
+                    <div class="cover-meta">
+                        <p id="detail-sub" class="detail-sub"></p>
+                        <h2 id="detail-title"></h2>
+                        <p id="detail-info" class="detail-info"></p>
+                    </div>
+                </div>
+                <div id="diff-row" class="diff-row" role="radiogroup" aria-label="難度"></div>
+                <div class="detail-bottom">
+                    <div class="best">
+                        <span class="best-label">最佳紀錄</span>
+                        <span id="best-score" class="best-score">—</span>
+                        <span id="best-badge" class="best-badge"></span>
+                    </div>
+                    <button type="button" id="btn-play" class="play-btn">開始 ▶</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 載入中 -->
+    <section id="screen-loading" class="screen dim" hidden>
+        <div class="loader"><span></span></div>
+        <p id="loading-text">載入中……</p>
+    </section>
+
+    <!-- 遊戲中的暫停按鈕 -->
+    <button type="button" id="btn-pause" class="pause-btn" aria-label="暫停" hidden><span></span><span></span></button>
+
+    <!-- 暫停 -->
+    <section id="screen-pause" class="screen dim" hidden role="dialog" aria-modal="true" aria-label="暫停">
+        <div class="pause-menu">
+            <button type="button" id="btn-resume" class="round-btn primary" aria-label="繼續">▶</button>
+            <button type="button" id="btn-retry" class="round-btn" aria-label="重新開始">↻</button>
+            <button type="button" id="btn-quit" class="round-btn" aria-label="返回選曲">☰</button>
+        </div>
+        <div class="pause-labels"><span>繼續</span><span>重來</span><span>選曲</span></div>
+    </section>
+
+    <div id="countdown" hidden></div>
+
+    <!-- 結算 -->
+    <section id="screen-result" class="screen" hidden>
+        <div class="select-bg" id="result-bg"></div>
+        <div class="result">
+            <div class="result-left">
+                <img id="result-cover" alt="">
+                <p id="result-title" class="result-title"></p>
+                <p id="result-diff" class="result-diff"></p>
+            </div>
+            <div class="result-right">
+                <div class="result-main">
+                    <span id="result-rank" class="result-rank">S</span>
+                    <div>
+                        <p id="result-score" class="result-score">0000000</p>
+                        <p id="result-acc" class="result-acc">100.00%</p>
+                        <p id="result-badges" class="result-badges"></p>
+                    </div>
+                </div>
+                <dl class="result-grid">
+                    <div><dt class="c-perfect">Perfect</dt><dd id="r-perfect">0</dd></div>
+                    <div><dt class="c-good">Good</dt><dd id="r-good">0</dd></div>
+                    <div><dt class="c-bad">Bad</dt><dd id="r-bad">0</dd></div>
+                    <div><dt class="c-miss">Miss</dt><dd id="r-miss">0</dd></div>
+                    <div><dt>最大連擊</dt><dd id="r-combo">0</dd></div>
+                    <div><dt>平均偏差</dt><dd id="r-offset">—</dd></div>
+                </dl>
+                <p id="result-tip" class="result-tip"></p>
+                <div class="result-actions">
+                    <button type="button" id="btn-again" class="wide-btn">↻ 再玩一次</button>
+                    <button type="button" id="btn-back" class="wide-btn primary">返回選曲</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 設定 -->
+    <section id="screen-settings" class="screen dim" hidden role="dialog" aria-modal="true" aria-labelledby="settings-title">
+        <div class="panel">
+            <header class="panel-head">
+                <h2 id="settings-title">設定</h2>
+                <button type="button" class="icon-btn" id="btn-settings-close" aria-label="關閉">✕</button>
+            </header>
+            <div class="panel-body settings-grid">
+                <label class="setting">
+                    <span class="setting-name">流速 <output id="v-speed"></output></span>
+                    <input type="range" id="s-speed" min="1" max="10" step="0.5">
+                </label>
+                <label class="setting">
+                    <span class="setting-name">音符大小 <output id="v-noteSize"></output></span>
+                    <input type="range" id="s-noteSize" min="0.8" max="1.4" step="0.05">
+                </label>
+                <label class="setting">
+                    <span class="setting-name">判定偏移 <output id="v-offset"></output></span>
+                    <input type="range" id="s-offset" min="-200" max="200" step="5">
+                    <span class="setting-help">結算常顯示「偏晚」就調高，「偏早」就調低。</span>
+                </label>
+                <label class="setting">
+                    <span class="setting-name">音樂音量 <output id="v-music"></output></span>
+                    <input type="range" id="s-music" min="0" max="100" step="5">
+                </label>
+                <label class="setting">
+                    <span class="setting-name">打擊音效 <output id="v-sfx"></output></span>
+                    <input type="range" id="s-sfx" min="0" max="100" step="5">
+                </label>
+                <label class="setting toggle">
+                    <span class="setting-name">自動演示<span class="setting-help">看電腦示範譜面，成績不記錄</span></span>
+                    <input type="checkbox" id="s-autoplay">
+                </label>
+            </div>
+            <p class="panel-foot">
+                iPhone：用 Safari 的「分享 → 加入主畫面」，就能全螢幕遊玩。
+            </p>
+        </div>
+    </section>
+
+    <!-- 玩法說明 -->
+    <section id="screen-help" class="screen dim" hidden role="dialog" aria-modal="true" aria-labelledby="help-title">
+        <div class="panel">
+            <header class="panel-head">
+                <h2 id="help-title">玩法</h2>
+                <button type="button" class="icon-btn" id="btn-help-close" aria-label="關閉">✕</button>
+            </header>
+            <div class="panel-body help-grid">
+                <div class="help-item"><i class="n n-tap"></i><b>Tap</b><span>音符碰到光弦時點一下</span></div>
+                <div class="help-item"><i class="n n-drag"></i><b>Drag</b><span>手指放在光弦上，音符經過就算</span></div>
+                <div class="help-item"><i class="n n-hold"></i><b>Hold</b><span>點下去並按住，直到尾端</span></div>
+                <div class="help-item"><i class="n n-flick"></i><b>Flick</b><span>在光弦上往任意方向快速滑動</span></div>
+                <p class="help-more">
+                    光弦會移動、旋轉，也會分成好幾條。音符一定會沿著光弦的方向落下，
+                    判定只看手指在光弦上的位置（離光弦多遠都可以）。
+                    第一次玩建議先選「新手教學」。
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- 直式提示 -->
+    <div id="rotate" aria-live="polite">
+        <div class="rotate-phone"></div>
+        <p>請把手機轉成橫向</p>
+    </div>
+
+    <div id="toast" role="status" aria-live="polite"></div>
+
+    <script src="js/chart.js"></script>
+    <script src="js/synth.js"></script>
+    <script src="js/game.js"></script>
+    <script src="js/songs/tutorial.js"></script>
+    <script src="js/songs/lumen.js"></script>
+    <script src="js/songs/theme-onsets.js"></script>
+    <script src="js/songs/theme.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
