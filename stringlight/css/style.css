@@ -14,6 +14,7 @@
     --gold: #ffe29a;
     --good: #8fe3ff;
     --bad: #ff7b8f;
+    color-scheme: dark;
     --font: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
     --safe-l: env(safe-area-inset-left, 0px);
     --safe-r: env(safe-area-inset-right, 0px);
