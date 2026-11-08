@@ -39,7 +39,7 @@
         for (let i = 0; i < 6; i++) A.drag(bar(9) + 2 + i * 0.25, Math.round((0.2 - i * 0.04) * 100) / 100);
 
         // Hold
-        ch.text(bar(10) + 0.5, bar(11) + 2, "Hold\n點下去並按住，直到尾端");
+        ch.text(bar(10) + 0.5, bar(11) + 2, "Hold\n點下去並按住，快到尾端時就可以放開");
         A.hold(bar(11), 3, -0.15);
         A.hold(bar(12), 3, 0.15);
         A.hold(bar(13), 1.5, -0.2);

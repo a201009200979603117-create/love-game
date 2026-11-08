@@ -27,9 +27,9 @@
         bad: 0.18,
         drag: 0.12,
         flick: 0.15,
-        // 長押尾端：只分「完成」或 Miss
+        // 長押尾判：只分「完成」或 Miss
         holdGrace: 0.05,   // 手指短暫離開判定範圍的容許時間
-        holdEarly: 0.06    // 尾端前多久放手仍算完成
+        holdTail: 0.25     // 最後這個比例的長度不用按，期間放手也算完成
     };
     // 開場與結尾：判定線從中間展開／收回
     const OPEN_LINE = 1.0;     // 展開所需秒數；展開完成前不顯示任何音符
@@ -497,8 +497,8 @@
                             if (t >= n.end) {
                                 this.finishHold(n);
                             } else if (t - n.lastHeld > WIN.holdGrace) {
-                                // 放手：只有在尾端前一點點才算完成，否則 Miss
-                                if (n.lastHeld >= n.end - WIN.holdEarly) this.finishHold(n);
+                                // 放手：已經按到最後 1/4 就算完成，否則 Miss
+                                if (n.lastHeld >= n.end - (n.end - n.t) * WIN.holdTail) this.finishHold(n);
                                 else this.miss(n);
                             } else {
                                 this.holdSpark(n, t);
@@ -511,7 +511,7 @@
         }
 
         // 長押：按下時（頭判）決定 Perfect 或 Good，沒有 Bad；
-        // 尾判只有 Perfect 或 Miss：按到尾端前 WIN.holdEarly 秒以內才算完成，太早放開就是 Miss。
+        // 尾判只有 Perfect 或 Miss：按過長度的 3/4 就算完成（最後 1/4 可以放手），更早放開就是 Miss。
         // 完成時以頭判的結果計分，尾端顯示 Perfect 的特效。
         finishHold(n) {
             n.state = DONE;
