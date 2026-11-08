@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#151525">
+    <title>心動節拍</title>
+    <link rel="stylesheet" href="rhythm/rhythm.css">
+</head>
+
+<body>
+    <!-- 遊戲畫布 -->
+    <canvas id="playfield" aria-label="節奏遊戲畫面"></canvas>
+
+    <!-- 柳如煙（遊戲中於大螢幕顯示在左側） -->
+    <div id="heroine" aria-hidden="true">
+        <div id="heroine-bubble"></div>
+        <img id="heroine-image" src="images/heroine.png" alt="">
+    </div>
+
+    <!-- ==============================
+         遊戲中 HUD
+    ============================== -->
+    <div id="hud" hidden>
+        <div class="hud-left">
+            <button id="pause-button" type="button" aria-label="暫停">❚❚</button>
+            <div>
+                <p id="hud-title"></p>
+                <p id="hud-difficulty"></p>
+            </div>
+        </div>
+        <div class="hud-right">
+            <p id="hud-score">0000000</p>
+            <p id="hud-accuracy">100.00%</p>
+        </div>
+        <div id="hud-progress"><div id="hud-progress-fill"></div></div>
+    </div>
+
+    <!-- ==============================
+         選曲畫面
+    ============================== -->
+    <section id="screen-select" class="screen">
+        <div class="select-panel">
+            <header class="select-header">
+                <p class="eyebrow">HEARTBEAT RHYTHM</p>
+                <h1>心動節拍</h1>
+                <p class="select-lead">
+                    她說，心跳也是一種節奏。
+                    <br>
+                    跟著音樂按下按鍵，和柳如煙一起把旋律完成吧。
+                </p>
+            </header>
+
+            <div id="song-list" role="radiogroup" aria-label="選擇歌曲"></div>
+
+            <div class="difficulty-row" role="radiogroup" aria-label="選擇難度">
+                <button type="button" class="difficulty" data-difficulty="easy" role="radio">簡單</button>
+                <button type="button" class="difficulty" data-difficulty="normal" role="radio">普通</button>
+                <button type="button" class="difficulty" data-difficulty="hard" role="radio">困難</button>
+            </div>
+
+            <p id="best-line" aria-live="polite"></p>
+
+            <div class="select-actions">
+                <button type="button" id="play-button" class="primary">開始演奏　♪</button>
+                <button type="button" id="settings-button" class="ghost">⚙ 設定</button>
+            </div>
+
+            <p class="key-hint" id="key-hint">
+                <kbd>D</kbd><kbd>F</kbd><kbd>J</kbd><kbd>K</kbd> 打擊　·　<kbd>Esc</kbd> 暫停
+            </p>
+
+            <a class="back-link" href="index.html">← 回到《心動的每一天》</a>
+
+            <input type="file" id="file-input" accept="audio/*" hidden>
+        </div>
+    </section>
+
+    <!-- 載入中 -->
+    <section id="screen-loading" class="screen" hidden>
+        <div class="loading-box">
+            <div class="loading-heart">♥</div>
+            <p id="loading-text">譜面生成中……</p>
+        </div>
+    </section>
+
+    <!-- 倒數（開始與暫停後繼續） -->
+    <div id="countdown" hidden></div>
+
+    <!-- ==============================
+         暫停
+    ============================== -->
+    <section id="screen-pause" class="screen dim" hidden role="dialog" aria-modal="true" aria-labelledby="pause-title">
+        <div class="modal">
+            <p class="eyebrow">PAUSED</p>
+            <h2 id="pause-title">暫停中</h2>
+            <button type="button" id="resume-button" class="primary">繼續</button>
+            <button type="button" id="retry-button" class="ghost">重新開始</button>
+            <button type="button" id="quit-button" class="ghost">返回選曲</button>
+        </div>
+    </section>
+
+    <!-- ==============================
+         結算
+    ============================== -->
+    <section id="screen-result" class="screen dim" hidden>
+        <div class="result-card">
+            <div class="result-heroine">
+                <img id="result-heroine" src="images/heroine.png" alt="柳如煙">
+                <p id="result-line"></p>
+            </div>
+
+            <div class="result-body">
+                <p class="eyebrow" id="result-song"></p>
+                <div class="result-rank-row">
+                    <span id="result-rank">S</span>
+                    <div>
+                        <p id="result-score">0</p>
+                        <p id="result-accuracy">100.00%</p>
+                    </div>
+                </div>
+                <p id="result-badges"></p>
+
+                <dl class="result-stats">
+                    <div><dt class="j-perfect">PERFECT</dt><dd id="result-perfect">0</dd></div>
+                    <div><dt class="j-great">GREAT</dt><dd id="result-great">0</dd></div>
+                    <div><dt class="j-good">GOOD</dt><dd id="result-good">0</dd></div>
+                    <div><dt class="j-miss">MISS</dt><dd id="result-miss">0</dd></div>
+                    <div><dt>最大連擊</dt><dd id="result-combo">0</dd></div>
+                    <div><dt>平均偏差</dt><dd id="result-offset">0 ms</dd></div>
+                </dl>
+                <p id="result-tip"></p>
+
+                <div class="result-actions">
+                    <button type="button" id="again-button" class="primary">再玩一次</button>
+                    <button type="button" id="back-button" class="ghost">返回選曲</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ==============================
+         設定
+    ============================== -->
+    <section id="screen-settings" class="screen dim" hidden role="dialog" aria-modal="true" aria-labelledby="settings-title">
+        <div class="modal settings">
+            <p class="eyebrow">SETTINGS</p>
+            <h2 id="settings-title">遊戲設定</h2>
+
+            <label class="setting">
+                <span class="setting-row"><span>下落速度</span><output id="speed-value">5</output></span>
+                <input type="range" id="speed" min="1" max="10" step="0.5" value="5">
+            </label>
+
+            <label class="setting">
+                <span class="setting-row"><span>判定偏移</span><output id="offset-value">0 ms</output></span>
+                <input type="range" id="offset" min="-200" max="200" step="5" value="0">
+                <span class="setting-help">結算畫面常顯示「偏晚」就調高，常「偏早」就調低。</span>
+            </label>
+
+            <label class="setting">
+                <span class="setting-row"><span>音樂音量</span><output id="music-value">80%</output></span>
+                <input type="range" id="music" min="0" max="100" step="5" value="80">
+            </label>
+
+            <label class="setting">
+                <span class="setting-row"><span>打擊音效</span><output id="sfx-value">60%</output></span>
+                <input type="range" id="sfx" min="0" max="100" step="5" value="60">
+            </label>
+
+            <label class="setting toggle">
+                <span>
+                    自動演奏
+                    <span class="setting-help">讓電腦示範一次，成績不會被記錄。</span>
+                </span>
+                <input type="checkbox" id="autoplay">
+            </label>
+
+            <button type="button" id="settings-done" class="primary">完成</button>
+        </div>
+    </section>
+
+    <div id="toast" role="status" aria-live="polite"></div>
+
+    <script src="rhythm/chart.js"></script>
+    <script src="rhythm/song-heartbeat.js"></script>
+    <script src="rhythm/game.js"></script>
+</body>
+</html>

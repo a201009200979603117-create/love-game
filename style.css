@@ -3150,3 +3150,32 @@ body {
 #confirm-actions #confirm-ok:hover {
     background: rgba(189, 140, 255, 0.8);
 }
+
+
+/* ==============================
+   節奏小遊戲入口（rhythm.html）
+============================== */
+
+#menu #rhythm-link {
+    position: relative;
+    z-index: 2;
+    display: inline-block;
+    margin-top: 14px;
+    padding: 9px 4px;
+    color: #5e8fb0;
+    font-size: 14px;
+    letter-spacing: 1px;
+    text-decoration: none;
+    border-bottom: 1px dashed rgba(94, 143, 176, 0.5);
+    transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+#menu #rhythm-link:hover {
+    color: #ff6f93;
+    border-bottom-color: rgba(255, 111, 147, 0.6);
+}
+
+#menu #rhythm-link:focus-visible {
+    outline: 2px solid #5e9fc6;
+    outline-offset: 3px;
+}
