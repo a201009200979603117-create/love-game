@@ -284,12 +284,18 @@
         const hard = level === "hard";
 
         // 判定線轉動時不放音符
+        // 高潮二中段兩條線交換位置：交換時完全不放音符，前後留空檔；
+        // 交換後的兩小節只留主旋律，第二條線整段休息
+        const d2 = SEC.drop2.start;
+        const swapRest = (beat, second) => second
+            ? beat >= d2 + 30.5 && beat < d2 + 44.5
+            : (beat >= d2 + 31 && beat < d2 + 36.5) || (beat >= d2 + 39.5 && beat < d2 + 44.5);
+
         const blocked = beat =>
             beat === SEC.outro.start ||   // 尾聲第一拍改成 Flick
             (beat >= SEC.break.start && beat < SEC.break.start + 2) ||
             (beat >= SEC.break.start + 24 && beat < SEC.break.start + 28) ||
-            (beat >= SEC.drop2.start + 32 && beat < SEC.drop2.start + 36 && !hard) ||
-            (beat >= SEC.drop2.start + 40 && beat < SEC.drop2.start + 44 && !hard);
+            swapRest(beat, false);
 
         /* ---- 前奏 ---- */
         const intro = SEC.intro;
@@ -359,16 +365,17 @@
                 for (let i = 0; i < s.bars - 1; i++) {
                     const b = s.start + i * 4;
                     const phrase = i % 4 === 0;
-                    if (phrase && !blocked(b)) B.flick(b, 0);
+                    const restB = beat => blocked(beat) || swapRest(beat, true);
+                    if (phrase && !restB(b)) B.flick(b, 0);
                     if (easy) continue;
                     const second = name === "drop2" || i >= 8;
-                    [0, 1, 2, 3].forEach(p => {
-                        if (blocked(b + p) || (p === 0 && phrase)) return;
+                    [1, 2, 3].forEach(p => {
+                        if (restB(b + p)) return;
                         if (!hard) {
                             if (second && p % 2) B.drag(b + p, p === 1 ? -0.08 : 0.08);
                             return;
                         }
-                        // 困難：大鼓 Drag ＋ 拍手 Tap
+                        // 困難：拍手 Tap ＋ 第三拍 Drag（每小節 3 個，留給主旋律空間）
                         if (p % 2) B.tap(b + p, p === 1 ? -0.1 : 0.1);
                         else B.drag(b + p, 0);
                     });

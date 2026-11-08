@@ -900,3 +900,90 @@ input:focus-visible {
         animation: none;
     }
 }
+
+/* ---------- 設定分組、校準 ---------- */
+
+.settings-group {
+    grid-column: 1 / -1;
+    margin: 1vh 0 -0.6vh;
+    padding-bottom: 0.8vh;
+    border-bottom: 1px solid var(--line);
+    font-size: clamp(11px, 3.2vh, 13px);
+    font-weight: 600;
+    letter-spacing: 0.3em;
+    color: var(--gold);
+}
+
+.settings-group:first-child {
+    margin-top: 0;
+}
+
+.mini-btn {
+    margin-top: 1vh;
+    padding: 6px 14px;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.06);
+    font-size: clamp(11px, 3.2vh, 13px);
+}
+
+.mini-btn:active {
+    background: rgba(255, 255, 255, 0.16);
+}
+
+.calib {
+    width: min(520px, 86vw);
+}
+
+.calib-body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2vh;
+    text-align: center;
+}
+
+.calib-text {
+    margin: 0;
+    max-width: 36em;
+    font-size: clamp(11px, 3.4vh, 14px);
+    line-height: 1.7;
+    color: var(--muted);
+}
+
+.calib-pad {
+    display: grid;
+    place-items: center;
+    width: max(96px, 30vh);
+    height: max(96px, 30vh);
+    border: 2px solid rgba(255, 244, 227, 0.6);
+    border-radius: 50%;
+    background: rgba(255, 244, 227, 0.06);
+    font-size: clamp(14px, 6vh, 26px);
+    font-weight: 600;
+    transition: transform 0.08s ease, background-color 0.12s ease, box-shadow 0.12s ease;
+    touch-action: none;
+}
+
+.calib-pad.beat {
+    box-shadow: 0 0 0 6px rgba(255, 226, 154, 0.25), 0 0 30px rgba(255, 226, 154, 0.5);
+}
+
+.calib-pad.hit {
+    transform: scale(0.95);
+    background: rgba(255, 244, 227, 0.18);
+}
+
+.calib-result {
+    min-height: 1.5em;
+    margin: 0;
+    font-size: clamp(13px, 4.2vh, 18px);
+    font-variant-numeric: tabular-nums;
+}
+
+.calib-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    width: 100%;
+}

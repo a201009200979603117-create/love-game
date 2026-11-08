@@ -26,7 +26,10 @@
         good: 0.15,
         bad: 0.18,
         drag: 0.12,
-        flick: 0.15
+        flick: 0.15,
+        // 長押尾端：只分「完成」或 Miss
+        holdGrace: 0.05,   // 手指短暫離開判定範圍的容許時間
+        holdEarly: 0.06    // 尾端前多久放手仍算完成
     };
     const ACC_WEIGHT = { perfect: 1, good: 0.65, bad: 0, miss: 0 };
 
@@ -39,6 +42,14 @@
         perfect: "#ffe29a",
         good: "#8fe3ff",
         bad: "#ff7b8f"
+    };
+
+    const NOTE_STYLE = {
+        tap: { base: "#3fc6ff", edge: "#d4f4ff", dark: "#1d8fc4" },
+        hold: { base: "#3fc6ff", edge: "#d4f4ff", dark: "#1d8fc4", body: "rgba(63, 198, 255, 0.42)", bodyActive: "rgba(150, 228, 255, 0.72)" },
+        drag: { base: "#ffcd45", edge: "#fff3c4", dark: "#d89a12" },
+        flick: { base: "#ff4f7b", edge: "#ffd6e0", dark: "#c92652" },
+        multi: "#ffe9a8"
     };
 
     const FONT = '"Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif';
@@ -78,6 +89,7 @@
             this.offsets = [];
             this.first = 0;
             this.effects = [];
+            this.hints = [];
             this.touches = new Map();
             this.taps = [];
             this.paused = false;
@@ -92,7 +104,7 @@
 
         /* ---------- 版面 ---------- */
         resize() {
-            const dpr = Math.min(window.devicePixelRatio || 1, 2);
+            const dpr = this.settings.lowRes ? 1 : Math.min(window.devicePixelRatio || 1, 2);
             const W = window.innerWidth;
             const H = window.innerHeight;
             this.canvas.width = Math.round(W * dpr);
@@ -140,8 +152,10 @@
                 c.drawImage(small, (bg.width - w) / 2, (bg.height - h) / 2, w, h);
             }
             const grad = c.createLinearGradient(0, 0, 0, bg.height);
-            grad.addColorStop(0, "rgba(6, 6, 14, 0.62)");
-            grad.addColorStop(1, "rgba(6, 6, 14, 0.8)");
+            // 背景亮度：0% 全黑、100% 幾乎看得到整張曲繪
+            const dim = 1 - 0.75 * (this.settings.bgBright / 100);
+            grad.addColorStop(0, `rgba(6, 6, 14, ${dim.toFixed(3)})`);
+            grad.addColorStop(1, `rgba(6, 6, 14, ${Math.min(1, dim + 0.12).toFixed(3)})`);
             c.fillStyle = grad;
             c.fillRect(0, 0, bg.width, bg.height);
             this.background = bg;
@@ -287,7 +301,8 @@
             const v = this.view;
             const along = (x - l.cx) * l.cos + (y - l.cy) * l.sin;
             const target = n.pos * v.sw;
-            return Math.abs(along - target) <= v.noteW * 0.5 + v.sw * 0.04;
+            // 判定範圍固定，「音符大小」只影響外觀
+            return Math.abs(along - target) <= v.sw * 0.09;
         }
 
         perpDistance(n, x, y) {
@@ -337,6 +352,10 @@
                 const dt = tap.t - best.t;
                 const a = Math.abs(dt);
                 const kind = a <= WIN.perfect ? "perfect" : a <= WIN.good ? "good" : "bad";
+                if (kind !== "perfect" && this.settings.earlyLate) {
+                    const p = this.notePoint(best);
+                    this.hints.push({ x: p.x, y: p.y, ang: best.line.ang, text: dt < 0 ? "EARLY" : "LATE", color: dt < 0 ? "#8fe3ff" : "#ffb38a", at: performance.now() });
+                }
                 if (best.type === "tap") {
                     best.state = DONE;
                     best.result = kind;
@@ -433,8 +452,9 @@
                             if (this.touchInRange(n)) n.lastHeld = t;
                             if (t >= n.end) {
                                 this.finishHold(n);
-                            } else if (t - n.lastHeld > 0.12) {
-                                if (t > n.end - 0.15) this.finishHold(n);
+                            } else if (t - n.lastHeld > WIN.holdGrace) {
+                                // 放手：只有在尾端前一點點才算完成，否則 Miss
+                                if (n.lastHeld >= n.end - WIN.holdEarly) this.finishHold(n);
                                 else this.miss(n);
                             } else {
                                 this.holdSpark(n, t);
@@ -446,11 +466,12 @@
             while (this.first < notes.length && notes[this.first].state === DONE) this.first++;
         }
 
+        // 長押：按下時決定 Perfect 或 Good（沒有 Bad），尾端只檢查有沒有按到最後。
+        // 按完就照按下時的判定計分，中途放開就是 Miss。
         finishHold(n) {
             n.state = DONE;
             n.doneAt = n.end;
-            // 長押在尾端結算，判定沿用按下時的結果
-            this.record(n, n.result === "bad" ? "good" : n.result, null);
+            this.record(n, n.result, null);
         }
 
         miss(n) {
@@ -577,24 +598,34 @@
             g.drawImage(this.background, 0, 0);
             g.setTransform(v.dpr, 0, 0, v.dpr, 0, 0);
 
-            // 判定線
+            // 判定線（開啟 FC/AP 指示器時：全 Perfect 金色、Full Combo 藍色）
+            let lineColor = COLORS.line;
+            let glow = "rgba(255, 220, 170, 0.9)";
+            if (this.settings.fcap) {
+                const c = this.counts;
+                if (c.miss === 0 && c.bad === 0) {
+                    if (c.good === 0) { lineColor = "#ffe08a"; glow = "rgba(255, 210, 110, 0.95)"; }
+                    else { lineColor = "#9fe6ff"; glow = "rgba(110, 210, 255, 0.95)"; }
+                }
+            }
+            const fade = lineColor + "00";
             for (const l of this.lines) {
                 if (l.alpha <= 0.003) continue;
                 g.save();
                 g.translate(l.cx, l.cy);
                 g.rotate(l.ang);
                 g.globalAlpha = l.alpha;
-                g.shadowColor = "rgba(255, 220, 170, 0.9)";
+                g.shadowColor = glow;
                 g.shadowBlur = 10;
                 if (l.len >= v.reach) {
-                    g.fillStyle = COLORS.line;
+                    g.fillStyle = lineColor;
                 } else {
                     // 有長度的判定線：兩端淡出
                     const grad = g.createLinearGradient(-l.len, 0, l.len, 0);
-                    grad.addColorStop(0, "rgba(255, 244, 227, 0)");
-                    grad.addColorStop(0.18, COLORS.line);
-                    grad.addColorStop(0.82, COLORS.line);
-                    grad.addColorStop(1, "rgba(255, 244, 227, 0)");
+                    grad.addColorStop(0, fade);
+                    grad.addColorStop(0.18, lineColor);
+                    grad.addColorStop(0.82, lineColor);
+                    grad.addColorStop(1, fade);
                     g.fillStyle = grad;
                 }
                 g.fillRect(-l.len, -v.lineW / 2, l.len * 2, v.lineW);
@@ -605,6 +636,7 @@
             this.drawNotes(t, true);
             this.drawNotes(t, false);
             this.drawEffects();
+            this.drawHints();
             this.drawTexts(t);
             this.drawHud(t);
         }
@@ -652,74 +684,60 @@
             }
         }
 
+        // 音符：平整的長方形，上緣一道亮邊、兩端深色收邊
         drawHead(g, y, n) {
             const v = this.view;
-            const w = n.type === "drag" ? v.noteW * 0.92 : v.noteW;
-            const h = n.type === "drag" ? v.noteH * 0.6 : v.noteH;
-            const [light, deep] = COLORS[n.type];
+            const st = NOTE_STYLE[n.type];
+            const w = v.noteW * (n.type === "drag" ? 0.94 : 1);
+            const h = v.noteH * (n.type === "drag" ? 0.6 : 1);
             const x = -w / 2;
             const top = y - h / 2;
 
-            if (n.multi) {
-                g.fillStyle = "rgba(255, 255, 255, 0.85)";
-                roundRect(g, x - 3, top - 3, w + 6, h + 6, h / 2 + 3);
-                g.fill();
+            if (n.multi && this.settings.multiHint) {
+                g.fillStyle = NOTE_STYLE.multi;
+                g.fillRect(x - 2, top - 2, w + 4, h + 4);
             }
-            const grad = g.createLinearGradient(0, top, 0, top + h);
-            grad.addColorStop(0, light);
-            grad.addColorStop(1, deep);
-            g.fillStyle = grad;
-            roundRect(g, x, top, w, h, h / 2);
-            g.fill();
+            g.fillStyle = st.base;
+            g.fillRect(x, top, w, h);
+            g.fillStyle = st.edge;
+            g.fillRect(x, top, w, Math.max(1, h * 0.3));
+            const cap = Math.max(2, h * 0.3);
+            g.fillStyle = st.dark;
+            g.fillRect(x, top, cap, h);
+            g.fillRect(x + w - cap, top, cap, h);
 
-            if (n.type === "tap") {
-                g.fillStyle = "rgba(255, 255, 255, 0.95)";
-                g.fillRect(-w * 0.3, y - 1, w * 0.6, 2);
-            } else if (n.type === "drag") {
-                g.fillStyle = "rgba(255, 255, 255, 0.95)";
-                g.beginPath();
-                g.moveTo(0, y - h * 0.9);
-                g.lineTo(h * 0.9, y);
-                g.lineTo(0, y + h * 0.9);
-                g.lineTo(-h * 0.9, y);
-                g.closePath();
-                g.fill();
-            } else if (n.type === "flick") {
-                // 兩端的箭頭：提示要滑動
-                g.strokeStyle = "rgba(255, 255, 255, 0.95)";
-                g.lineWidth = Math.max(1.5, h * 0.18);
+            if (n.type === "flick") {
+                // 中央一個白色箭頭：提示要滑動
+                const s = h * 0.55;
+                g.strokeStyle = "#ffffff";
+                g.lineWidth = Math.max(1.6, h * 0.2);
                 g.lineCap = "round";
                 g.lineJoin = "round";
-                const s = h * 0.55;
-                [-1, 1].forEach(side => {
-                    const cx = side * w * 0.28;
-                    g.beginPath();
-                    g.moveTo(cx - s, y + s * 0.45);
-                    g.lineTo(cx, y - s * 0.45);
-                    g.lineTo(cx + s, y + s * 0.45);
-                    g.stroke();
-                });
+                g.beginPath();
+                g.moveTo(-s * 1.4, y + s * 0.42);
+                g.lineTo(0, y - s * 0.42);
+                g.lineTo(s * 1.4, y + s * 0.42);
+                g.stroke();
             }
         }
 
         drawHold(g, headY, tailY, n) {
             const v = this.view;
-            const w = v.noteW * 0.78;
+            const st = NOTE_STYLE.hold;
+            const w = v.noteW * 0.9;
             const top = Math.min(headY, tailY);
             const bottom = Math.max(headY, tailY);
             if (bottom - top > 1) {
                 const holding = n.state === HOLDING;
-                const grad = g.createLinearGradient(0, tailY, 0, headY);
-                grad.addColorStop(0, "rgba(86, 214, 255, 0.15)");
-                grad.addColorStop(1, holding ? "rgba(190, 240, 255, 0.85)" : "rgba(86, 214, 255, 0.6)");
-                g.fillStyle = grad;
+                g.fillStyle = holding ? st.bodyActive : st.body;
                 g.fillRect(-w / 2, top, w, bottom - top);
-                g.fillStyle = holding ? "rgba(255, 255, 255, 0.95)" : "rgba(200, 245, 255, 0.8)";
-                g.fillRect(-w / 2, top, 2, bottom - top);
-                g.fillRect(w / 2 - 2, top, 2, bottom - top);
+                g.fillStyle = st.edge;
+                const edge = Math.max(1.5, v.noteH * 0.16);
+                g.fillRect(-w / 2, top, edge, bottom - top);
+                g.fillRect(w / 2 - edge, top, edge, bottom - top);
                 // 尾端
-                g.fillStyle = "rgba(233, 251, 255, 0.95)";
-                g.fillRect(-w / 2, tailY - 1.5, w, 3);
+                g.fillStyle = st.edge;
+                g.fillRect(-w / 2, tailY - edge, w, edge * 2);
             }
             if (n.state !== HOLDING) this.drawHead(g, headY, n);
         }
@@ -785,6 +803,28 @@
             g.globalAlpha = 1;
         }
 
+        drawHints() {
+            if (!this.hints.length) return;
+            const g = this.g;
+            const v = this.view;
+            const now = performance.now();
+            this.hints = this.hints.filter(h => now - h.at < 450);
+            g.textAlign = "center";
+            g.textBaseline = "middle";
+            g.font = "700 " + Math.round(v.sh * 0.03) + "px " + FONT;
+            for (const h of this.hints) {
+                const p = (now - h.at) / 450;
+                g.save();
+                g.translate(h.x, h.y);
+                g.rotate(h.ang);
+                g.globalAlpha = 1 - p * p;
+                g.fillStyle = h.color;
+                g.fillText(h.text, 0, -v.noteH * 2.4 - p * v.noteH);
+                g.restore();
+            }
+            g.globalAlpha = 1;
+        }
+
         drawTexts(t) {
             const texts = this.chart.texts;
             if (!texts.length) return;
@@ -831,7 +871,7 @@
             const c = this.counts;
             let status = "";
             if (this.judged > 0 && c.miss === 0 && c.bad === 0) status = c.good === 0 ? "ALL PERFECT" : "FULL COMBO";
-            if (status) {
+            if (status && !this.settings.fcap) {
                 g.font = "600 " + Math.round(v.sh * 0.026) + "px " + FONT;
                 g.fillStyle = status === "ALL PERFECT" ? COLORS.perfect : COLORS.good;
                 g.fillText(status, v.W - pad, pad * 0.8 + v.sh * 0.075);

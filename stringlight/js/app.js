@@ -31,7 +31,11 @@
         }
     }
 
-    const DEFAULTS = { speed: 5, noteSize: 1, offset: 0, music: 80, sfx: 60 };
+    const DEFAULTS = {
+        speed: 5, noteSize: 1, offset: 0,
+        bgBright: 40, fcap: true, multiHint: true, earlyLate: true, lowRes: false,
+        music: 80, sfx: 60, ui: 50
+    };
     const settings = Object.assign({}, DEFAULTS, read(SETTINGS_KEY, {}), { autoplay: false });
 
     function saveSettings() {
@@ -48,7 +52,14 @@
         game: null,
         lastRun: null
     };
-    if (!SONGS[state.song].difficulties.some(d => d.id === state.diff)) state.diff = "normal";
+    // 確保選到的難度存在（例如「新手教學」只有一種難度）
+    function fixDifficulty() {
+        const diffs = SONGS[state.song].difficulties;
+        if (!diffs.some(d => d.id === state.diff)) {
+            state.diff = diffs.some(d => d.id === "normal") ? "normal" : diffs[0].id;
+        }
+    }
+    fixDifficulty();
 
     /* ---------- 音訊 ---------- */
     function audio() {
@@ -92,7 +103,7 @@
     SONGS.forEach(s => image(s.cover));
 
     /* ---------- 畫面 ---------- */
-    const screens = ["title", "select", "loading", "pause", "result", "settings", "help"];
+    const screens = ["title", "select", "loading", "pause", "result", "settings", "help", "calib"];
     function show(name) {
         screens.forEach(s => { $("screen-" + s).hidden = s !== name; });
     }
@@ -189,7 +200,7 @@
             btn.addEventListener("click", () => {
                 if (state.song === i) return;
                 state.song = i;
-                if (!song.difficulties.some(d => d.id === state.diff)) state.diff = song.difficulties[0].id;
+                fixDifficulty();
                 renderList();
                 renderDetail();
                 list.children[i].firstChild.focus({ preventScroll: true });
@@ -237,6 +248,7 @@
        遊戲
     ========================================================== */
     async function startSong(reuse) {
+        fixDifficulty();
         const song = SONGS[state.song];
         const diff = song.difficulties.find(d => d.id === state.diff);
         const au = audio();
@@ -425,32 +437,196 @@
         speed: v => v.toFixed(1),
         noteSize: v => Math.round(v * 100) + "%",
         offset: v => (v > 0 ? "+" : "") + v + " ms",
+        bgBright: v => v + "%",
         music: v => v + "%",
-        sfx: v => v + "%"
+        sfx: v => v + "%",
+        ui: v => v + "%"
     };
+    const TOGGLES = ["fcap", "multiHint", "earlyLate", "lowRes"];
+
+    function syncSettingsForm() {
+        Object.keys(FORMAT).forEach(key => {
+            $("s-" + key).value = settings[key];
+            $("v-" + key).textContent = FORMAT[key](settings[key]);
+        });
+        TOGGLES.forEach(key => { $("s-" + key).checked = !!settings[key]; });
+        $("s-autoplay").checked = settings.autoplay;
+    }
 
     Object.keys(FORMAT).forEach(key => {
         const input = $("s-" + key);
-        const out = $("v-" + key);
-        input.value = settings[key];
-        out.textContent = FORMAT[key](settings[key]);
         input.addEventListener("input", () => {
             settings[key] = parseFloat(input.value);
-            out.textContent = FORMAT[key](settings[key]);
+            $("v-" + key).textContent = FORMAT[key](settings[key]);
             applyVolume();
             saveSettings();
         });
     });
+    TOGGLES.forEach(key => {
+        $("s-" + key).addEventListener("change", e => {
+            settings[key] = e.target.checked;
+            saveSettings();
+        });
+    });
     $("s-autoplay").addEventListener("change", e => { settings.autoplay = e.target.checked; });
+    $("btn-reset").addEventListener("click", () => {
+        Object.assign(settings, DEFAULTS);
+        syncSettingsForm();
+        applyVolume();
+        saveSettings();
+        toast("已恢復預設值");
+    });
+    syncSettingsForm();
 
     $("btn-settings").addEventListener("click", () => show("settings"));
     $("btn-settings-close").addEventListener("click", openSelect);
     $("btn-help").addEventListener("click", () => show("help"));
     $("btn-help-close").addEventListener("click", openSelect);
 
+    /* ==========================================================
+       延遲校準：每 0.6 秒一聲「噠」，跟著點，取中位數當作偏移
+    ========================================================== */
+    const CALIB_BEATS = 16;
+    const CALIB_WARMUP = 4;
+    const CALIB_GAP = 0.6;
+    const calib = { running: false, beats: [], taps: [], clock: { ct: -1, pt: 0 }, result: null, raf: 0 };
+
+    function calibNow() {
+        const ctx = state.audio.ctx;
+        const ct = ctx.currentTime;
+        const pt = performance.now();
+        if (ct !== calib.clock.ct) { calib.clock.ct = ct; calib.clock.pt = pt; }
+        const lat = typeof ctx.outputLatency === "number" && ctx.outputLatency > 0 && ctx.outputLatency < 0.5
+            ? ctx.outputLatency
+            : ctx.baseLatency || 0;
+        return ct + Math.min((pt - calib.clock.pt) / 1000, 0.05) - lat;
+    }
+
+    function calibReset() {
+        calib.running = false;
+        calib.result = null;
+        cancelAnimationFrame(calib.raf);
+        $("calib-count").textContent = "開始";
+        $("calib-result").textContent = "";
+        $("btn-calib-apply").disabled = true;
+        $("calib-pad").classList.remove("beat");
+    }
+
+    function calibStart() {
+        const au = audio();
+        const ctx = au.ctx;
+        calib.running = true;
+        calib.taps = [];
+        calib.beats = [];
+        const t0 = ctx.currentTime + 0.8;
+        for (let i = 0; i < CALIB_BEATS; i++) {
+            const t = t0 + i * CALIB_GAP;
+            calib.beats.push(t);
+            const o = ctx.createOscillator();
+            o.frequency.setValueAtTime(i < CALIB_WARMUP ? 1200 : 1600, t);
+            const g = ctx.createGain();
+            g.gain.setValueAtTime(0.0001, t);
+            g.gain.linearRampToValueAtTime(0.5, t + 0.002);
+            g.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+            o.connect(g).connect(au.music);
+            o.start(t);
+            o.stop(t + 0.1);
+        }
+        $("calib-result").textContent = "前 4 聲先聽節奏，之後跟著點";
+        const tick = () => {
+            if (!calib.running) return;
+            const now = calibNow();
+            const idx = calib.beats.findIndex(b => b > now) - 1;
+            const near = calib.beats.some(b => Math.abs(now - b) < 0.07);
+            $("calib-pad").classList.toggle("beat", near);
+            const left = idx < 0 ? CALIB_BEATS : CALIB_BEATS - 1 - idx;
+            $("calib-count").textContent = idx < CALIB_WARMUP - 1 ? "聽…" : String(Math.max(0, left));
+            if (now > calib.beats[CALIB_BEATS - 1] + 0.5) calibFinish();
+            else calib.raf = requestAnimationFrame(tick);
+        };
+        calib.raf = requestAnimationFrame(tick);
+    }
+
+    function calibFinish() {
+        calib.running = false;
+        $("calib-pad").classList.remove("beat");
+        const diffs = calib.taps
+            .map(t => {
+                let best = Infinity;
+                calib.beats.slice(CALIB_WARMUP).forEach(b => { if (Math.abs(t - b) < Math.abs(best)) best = t - b; });
+                return best;
+            })
+            .filter(d => Math.abs(d) < 0.3)
+            .sort((a, b) => a - b);
+        if (diffs.length < 6) {
+            $("calib-count").textContent = "再一次";
+            $("calib-result").textContent = "點擊次數不夠，請跟著「噠」聲多點幾下。";
+            return;
+        }
+        const median = diffs[diffs.length >> 1] * 1000;
+        calib.result = Math.max(-300, Math.min(300, Math.round(median / 5) * 5));
+        $("calib-count").textContent = "完成";
+        $("calib-result").textContent = `建議判定偏移：${calib.result > 0 ? "+" : ""}${calib.result} ms（目前 ${FORMAT.offset(settings.offset)}）`;
+        $("btn-calib-apply").disabled = false;
+    }
+
+    $("calib-pad").addEventListener("pointerdown", e => {
+        e.preventDefault();
+        const pad = $("calib-pad");
+        pad.classList.add("hit");
+        setTimeout(() => pad.classList.remove("hit"), 90);
+        if (!calib.running) {
+            calibReset();
+            calibStart();
+            return;
+        }
+        const lag = (performance.now() - e.timeStamp) / 1000;
+        calib.taps.push(calibNow() - (lag > 0 && lag < 0.1 ? lag : 0));
+    });
+    $("btn-calib").addEventListener("click", () => {
+        calibReset();
+        show("calib");
+    });
+    $("btn-calib-retry").addEventListener("click", () => {
+        calibReset();
+        calibStart();
+    });
+    $("btn-calib-apply").addEventListener("click", () => {
+        if (calib.result === null) return;
+        settings.offset = calib.result;
+        saveSettings();
+        syncSettingsForm();
+        calibReset();
+        show("settings");
+        toast("已套用判定偏移 " + FORMAT.offset(settings.offset));
+    });
+    $("btn-calib-close").addEventListener("click", () => {
+        calibReset();
+        show("settings");
+    });
+
+    /* ---------- 介面音效 ---------- */
+    document.addEventListener("click", e => {
+        const btn = e.target.closest && e.target.closest("button");
+        if (!btn || btn.id === "calib-pad" || !state.audio || settings.ui <= 0) return;
+        const ctx = state.audio.ctx;
+        const t = ctx.currentTime;
+        const o = ctx.createOscillator();
+        o.type = "sine";
+        o.frequency.setValueAtTime(1050, t);
+        o.frequency.exponentialRampToValueAtTime(760, t + 0.04);
+        const g = ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.linearRampToValueAtTime(0.12 * (settings.ui / 100), t + 0.003);
+        g.gain.exponentialRampToValueAtTime(0.0005, t + 0.06);
+        o.connect(g).connect(ctx.destination);
+        o.start(t);
+        o.stop(t + 0.07);
+    });
+
     /* ---------- 啟動 ---------- */
     show("title");
 
     // 給自動化測試與除錯用
-    window.Stringlight = { state, settings, startSong, openSelect, pause, resume };
+    window.Stringlight = { state, settings, startSong, openSelect, pause, resume, calib };
 })();

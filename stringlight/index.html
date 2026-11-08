@@ -128,6 +128,7 @@
                 <button type="button" class="icon-btn" id="btn-settings-close" aria-label="關閉">✕</button>
             </header>
             <div class="panel-body settings-grid">
+                <h3 class="settings-group">遊玩</h3>
                 <label class="setting">
                     <span class="setting-name">流速 <output id="v-speed"></output></span>
                     <input type="range" id="s-speed" min="1" max="10" step="0.5">
@@ -135,12 +136,42 @@
                 <label class="setting">
                     <span class="setting-name">音符大小 <output id="v-noteSize"></output></span>
                     <input type="range" id="s-noteSize" min="0.8" max="1.4" step="0.05">
+                    <span class="setting-help">只改變外觀，判定範圍不變。</span>
                 </label>
+                <div class="setting">
+                    <label class="setting-name" for="s-offset">判定偏移 <output id="v-offset"></output></label>
+                    <input type="range" id="s-offset" min="-300" max="300" step="5">
+                    <button type="button" id="btn-calib" class="mini-btn">延遲校準</button>
+                    <span class="setting-help">藍牙耳機通常要調高。不確定就按「延遲校準」。</span>
+                </div>
+                <label class="setting toggle">
+                    <span class="setting-name">自動演示<span class="setting-help">看電腦示範譜面，成績不記錄</span></span>
+                    <input type="checkbox" id="s-autoplay">
+                </label>
+
+                <h3 class="settings-group">畫面</h3>
                 <label class="setting">
-                    <span class="setting-name">判定偏移 <output id="v-offset"></output></span>
-                    <input type="range" id="s-offset" min="-200" max="200" step="5">
-                    <span class="setting-help">結算常顯示「偏晚」就調高，「偏早」就調低。</span>
+                    <span class="setting-name">背景亮度 <output id="v-bgBright"></output></span>
+                    <input type="range" id="s-bgBright" min="0" max="100" step="5">
                 </label>
+                <label class="setting toggle">
+                    <span class="setting-name">FC/AP 指示器<span class="setting-help">全 Perfect 時光弦是金色，Full Combo 時是藍色</span></span>
+                    <input type="checkbox" id="s-fcap">
+                </label>
+                <label class="setting toggle">
+                    <span class="setting-name">多押提示<span class="setting-help">同時出現的音符加上金框</span></span>
+                    <input type="checkbox" id="s-multiHint">
+                </label>
+                <label class="setting toggle">
+                    <span class="setting-name">早／晚提示<span class="setting-help">沒拿到 Perfect 時顯示 EARLY 或 LATE</span></span>
+                    <input type="checkbox" id="s-earlyLate">
+                </label>
+                <label class="setting toggle">
+                    <span class="setting-name">低解析度模式<span class="setting-help">手機發燙或卡頓時開啟</span></span>
+                    <input type="checkbox" id="s-lowRes">
+                </label>
+
+                <h3 class="settings-group">聲音</h3>
                 <label class="setting">
                     <span class="setting-name">音樂音量 <output id="v-music"></output></span>
                     <input type="range" id="s-music" min="0" max="100" step="5">
@@ -149,14 +180,36 @@
                     <span class="setting-name">打擊音效 <output id="v-sfx"></output></span>
                     <input type="range" id="s-sfx" min="0" max="100" step="5">
                 </label>
-                <label class="setting toggle">
-                    <span class="setting-name">自動演示<span class="setting-help">看電腦示範譜面，成績不記錄</span></span>
-                    <input type="checkbox" id="s-autoplay">
+                <label class="setting">
+                    <span class="setting-name">介面音效 <output id="v-ui"></output></span>
+                    <input type="range" id="s-ui" min="0" max="100" step="5">
                 </label>
+                <div class="setting">
+                    <button type="button" id="btn-reset" class="mini-btn">恢復預設值</button>
+                </div>
             </div>
             <p class="panel-foot">
                 iPhone：用 Safari 的「分享 → 加入主畫面」，就能全螢幕遊玩。
             </p>
+        </div>
+    </section>
+
+    <!-- 延遲校準 -->
+    <section id="screen-calib" class="screen dim" hidden role="dialog" aria-modal="true" aria-labelledby="calib-title">
+        <div class="panel calib">
+            <header class="panel-head">
+                <h2 id="calib-title">延遲校準</h2>
+                <button type="button" class="icon-btn" id="btn-calib-close" aria-label="關閉">✕</button>
+            </header>
+            <div class="panel-body calib-body">
+                <p id="calib-text" class="calib-text">戴上平常玩的耳機。按下圓圈開始，之後每聽到一聲「噠」就點一下圓圈。</p>
+                <button type="button" id="calib-pad" class="calib-pad"><span id="calib-count">開始</span></button>
+                <p id="calib-result" class="calib-result" aria-live="polite"></p>
+                <div class="calib-actions">
+                    <button type="button" id="btn-calib-retry" class="wide-btn">重新測量</button>
+                    <button type="button" id="btn-calib-apply" class="wide-btn primary" disabled>套用</button>
+                </div>
+            </div>
         </div>
     </section>
 
@@ -175,6 +228,8 @@
                 <p class="help-more">
                     光弦會移動、旋轉，也會分成好幾條。音符一定會沿著光弦的方向落下，
                     判定只看手指在光弦上的位置（離光弦多遠都可以）。
+                    Tap 依時機分 Perfect、Good、Bad；Hold 依按下的時機分 Perfect、Good，中途放開算 Miss；
+                    Drag 和 Flick 只有 Perfect 或 Miss。
                     第一次玩建議先選「新手教學」。
                 </p>
             </div>
